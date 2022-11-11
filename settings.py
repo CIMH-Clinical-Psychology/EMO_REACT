@@ -6,12 +6,34 @@ Settings file of Sleep-EMO-React study
 
 @author: Simon Kern
 """
+import re
 import warnings
 import ospath
 import getpass
 import platform
 import scipy.io
 from enum import IntEnum, unique
+
+def get_subj(string, pattern=r"PN[^0-9]*(\d+)/*"):
+    res = re.findall(pattern, string.upper() + '/')
+    assert len(res)!=0, f'Pattern {pattern} not found in string {string}'
+    assert len(res)==1, \
+        f'Found more or less pattern matches for {pattern} in {string}'
+    assert res[0].isdigit(), '{res} does not seem to be a digit?'
+    return f'PN{int(res[0]):02d}'
+
+def get_night(string):
+    subj = get_subj(string)
+    pattern = r"night[^0-9]*(\d+)/*"
+    res = re.findall(pattern, string.lower() + '/')
+    assert len(res)!=0, f'Pattern {pattern} not found in string {string}'
+    assert len(res)==1, \
+        f'Found more or less pattern matches for {pattern} in {string}'
+    assert res[0].isdigit(), '{res} does not seem to be a digit?'
+    
+    
+    return f'{subj}-night{res[0]}'
+
 
 def loadmat_single(mat):
     data = scipy.io.loadmat(mat)
@@ -30,10 +52,11 @@ class trigger(IntEnum):
     YESNO = 6
     QUADRANT = 7
 
-VAL_OLD = 0
-VAL_NEW = 1
+VAL_OLD = 0  # participant indicated he has seen the image before
+VAL_NEW = 1  # participant indicated that the image is new to him/her
     
-    
+ref_ch = 'FCz'  # reference channel used in the sleep lab
+   
 
 use_caching = False
 
@@ -68,5 +91,5 @@ else:
 #     plot_dir = 'z:/plots/'
     
 
-montage_file = f'{data_dir}/montages/CACS-74-X1_alle-Positionen.bvef'
+montage_file = f'{data_dir}/montages/all_combined.bvef'
 

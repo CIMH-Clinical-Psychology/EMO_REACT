@@ -37,19 +37,14 @@ from mne.datasets import sample
 from mne.preprocessing import Xdawn
 from mne.decoding import Vectorizer
 
-
 print(__doc__)
 
 data_path = sample.data_path()
 
 
 #%% settings
-folders = [f'{settings.data_dir}/Raw_data/PN4/Experimental night 1/',
-           f'{settings.data_dir}/Raw_data/PN4/Experimental night 2/']
-
 mse = make_scorer(mean_squared_error, greater_is_better=False)
-tmin= -0.5
-tmax = 1.5
+
 
 clf_rfr = SlidingEstimator(RandomForestRegressor(500), n_jobs=-1)
 clf_rfc = SlidingEstimator(RandomForestClassifier(500), n_jobs=-1)
@@ -74,6 +69,27 @@ clfs = {
         }
 colors = sns.color_palette()
 
+#%% data loading
+
+folders = ospath.list_folders(f'{settings.data_dir}/Raw_data/', pattern='*night*', recursive=True)
+
+sfreq = 100
+tmin= -0.5
+tmax = 1.5
+
+data = {}
+
+for folder in folders:
+    night = settings.get_night(folder)
+    # try:
+    res = load_localizer(folder, sfreq=sfreq, tmin=tmin, tmax=tmax, event_id=trigger.STIMULUS)
+    times, train_x, (train_y_valence, train_y_arousal) = res
+    data[night] = times, train_x, train_y_valence, train_y_arousal
+    # except Exception as e:
+        # print(f'################ {night} could not be loaded {e}')
+        # pass
+
+stop
 #%% run calculations
 # plt.maximize=False
 for sfreq in [100]:
