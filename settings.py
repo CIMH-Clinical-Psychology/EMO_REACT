@@ -89,7 +89,8 @@ else:
 #     data_dir = 'z:/desmrrest/'
 #     cache_dir = 'z:/cache/'
 #     plot_dir = 'z:/plots/'
-    
 
-montage_file = f'{data_dir}/montages/all_combined.bvef'
+montage_file = './montage.bvef'
+if not os.path.exists(montage_file):
+    montage_file = f'{data_dir}/montages/all_combined.bvef'
 
