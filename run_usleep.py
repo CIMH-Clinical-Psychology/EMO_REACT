@@ -29,7 +29,7 @@ from getpass import getpass
 def predict_usleep(edf_file, ch_groups, saveto=None):
     
     # Create an API token at https://sleep.ai.ku.dk.
-    api_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2NjQzMTE4MTEsImlhdCI6MTY2NDI2ODYxMSwibmJmIjoxNjY0MjY4NjExLCJpZGVudGl0eSI6IjUzMTU5NGUwMTc0MSJ9.y7b_X1_pY1BupoLSuOOdqBeEgqW24u-OQbOktE72D7I"  # Insert here
+    api_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2NzAyODQ4OTksImlhdCI6MTY3MDI0MTY5OSwibmJmIjoxNjcwMjQxNjk5LCJpZGVudGl0eSI6IjUzMTU5NGUwMTc0MSJ9.E6AUuia-N3zfzkNqaX_v-ZO3g9GtOu0dm9UiforbBTo"  # Insert here
 
     # Create an API object and (optionally) a new session.
     try:
@@ -78,12 +78,18 @@ def predict_usleep(edf_file, ch_groups, saveto=None):
 plt.maximize=False
 if __name__=='__main__':
     
-    files = ospath.choose_files('Z:/Emo_React/Raw_data/', exts=['vhdr'])
+    # files = ospath.choose_files('Z:/Emo_React/Raw_data/', exts=['vhdr'])
+    patterns = ['*sleep*vhdr', '*AN*vhdr']
+    files = ospath.list_files('Z:/Emo_React/Raw_data/', patterns=patterns, recursive=True)
+    files = [f for f in files if not 'test' in f.lower()]
     
     
     for file in tqdm(files, desc='Creating hypnograms and spectrograms'):
-        
         hypno_file = file + '.txt'
+        png_file = file + '.png'
+        if os.path.exists(png_file) and os.path.exists(hypno_file):
+            print(f'Files already exist for {file=}, no overwrite')
+            continue
         raw = mne.io.read_raw_brainvision(file, preload=True, 
                                           eog=['HEOG', 'VEOG'],
                                           misc=['EMG', 'ECG'])
@@ -103,6 +109,7 @@ if __name__=='__main__':
             eog_chs = ['VEOG', 'HEOG']
             ch_groups = list(itertools.product(eeg_chs, eog_chs))
             hypno = predict_usleep(edf_file, ch_groups=ch_groups, saveto=hypno_file)       
+            os.remove(edf_file)
             
         hypno = sleep_utils.read_hypno(hypno_file)    
         sleep_utils.hypno_summary(hypno[3:])
@@ -116,4 +123,4 @@ if __name__=='__main__':
                                         title=f'ch: {raw.ch_names[2]}')
         plt.tight_layout()
         plt.pause(0.01)
-        fig.savefig(f'{file}.png')
+        fig.savefig(png_file)

@@ -65,7 +65,7 @@ def get_test_mapping(mat_file):
     return resp_info
 
 
-folders = [f'Z:/Emo_React/Raw_data/Final dry run']
+folders = ospath.list_folders(settings.data_dir, pattern='*night*', recursive=True)[1:]
 
 
 logs = {}
