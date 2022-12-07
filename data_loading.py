@@ -33,9 +33,9 @@ mem = Memory(settings.cache_dir)
 @functools.cache
 def read_oasis_csv():
     try:
-        df = pd.read_csv('OASIS.csv')
+        df = pd.read_csv('./resources/OASIS.csv')
     except:
-        df = pd.read_csv('../OASIS.csv')
+        df = pd.read_csv('../resources/OASIS.csv')
     df['Theme'] = df['Theme'].apply(str.strip)
     df = df.set_index('Theme')
     return df

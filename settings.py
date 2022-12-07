@@ -88,6 +88,6 @@ else:
 
 montage_file = f'{data_dir}/montages/montage.bvef'
 if not os.path.exists(montage_file):
-    montage_file = './montage.bvef'
+    montage_file = './resources/montage.bvef'
 
 os.makedirs(cache_dir, exist_ok=True)
