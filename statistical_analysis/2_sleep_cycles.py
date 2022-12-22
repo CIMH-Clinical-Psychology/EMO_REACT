@@ -54,7 +54,7 @@ for folder in tqdm(folders_subj, desc='loading participant responses'):
             resp = data_loading.load_test_responses(folder_night, which=test_type)
             data[subj][night_type][test_type] = resp
 
-stop
+# stop
 
 #%% First very basic overall sleep stage distribution analyis
 
@@ -75,3 +75,9 @@ for i, name in enumerate(summary):
     sns.scatterplot(data=df, x='night', y=name, ax=axs[i])
     _, pval = ttest_rel(df[df.night=='low'][name], df[df.night=='high'][name])
     axs[i].set_title(f'{name} {pval=:.2f}')
+
+plt.suptitle(f'Sleep parameters for n={len(data.keys())} [{list(data)}]')
+
+plt.tight_layout()
+plt.pause(0.1)
+plt.savefig('../plots/2_sleep_parameters.png')

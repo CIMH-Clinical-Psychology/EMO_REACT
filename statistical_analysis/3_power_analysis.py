@@ -13,7 +13,6 @@ import settings
 from settings import stage_map
 import data_loading
 import yasa
-import utils
 from tqdm import tqdm
 from scipy.stats import ttest_rel
 from joblib import Parallel, delayed

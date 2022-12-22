@@ -99,6 +99,6 @@ for i, marker in enumerate(markers):
         _, p = ttest_rel(vals1, vals2)
         pvals[stage] = np.round(p, 3)
     axs[i].set_title(f'{marker}, p={pvals}')
-plt.suptitle(f'Power band analysis per sleep stage n={len(df.Subject.unique())}')
+plt.suptitle(f'Spindle analysis per sleep stage using YASA algorithm n={len(df.Subject.unique())}')
 plt.pause(0.1)  
 plt.tight_layout()
