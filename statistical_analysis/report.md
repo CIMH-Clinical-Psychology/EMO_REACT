@@ -23,7 +23,7 @@
 
 **Description**: For each image that the participant classified as `old`, they were asked to indicate in which of four quadrant the image originally appeared. As the distribution of  quadrants is uniform, i.e., each quadrant was assigned exactly 25% of the times, an accuracy score is accurate measure for this task. For this analysis, only images that were correctly identified as `old` by the participant were included.
 
-**Results**: Using a relative ttest, no significant increase in learning could be found from before and after sleep, neither in the `high` nor `low` condition (p=0.11, p=0.54). However, the variance in learning performance was much higher in the `high` condition, sorry, I don't know off the top of my hat how one would statistically test that.
+**Results**: Using a relative ttest, no significant increase in learning could be found from before and after sleep, neither in the `high` nor `low` condition (p=0.11, p=0.54). However, the variance in learning performance was much higher in the `high` condition. Sorry, I don't know off the top of my hat how one would statistically test that, probably with a two-way ANOVA, but I've never done that, so for now I'd have to leave that out. However, I don't expect it to be significant, there's just one outlier participant with lower quadrant performance.
 
 ![](md_assets/2022-12-22-14-57-54-image.png)
 
