@@ -18,13 +18,35 @@ from tqdm import tqdm
 from scipy.stats import ttest_rel
 import numpy as np
 from joblib import Parallel, delayed, Memory
+from pandas.api.types import is_numeric_dtype
+
 import matplotlib.pyplot as plt
 sns.set(font_scale=1.2)
 memory = Memory(settings.cache_dir)
 
 # check which data is loadable
 folders_subj = ospath.list_folders(f'{settings.data_dir}/Raw_data/', pattern='PN*')
+def aggregate(df, by1='Condition', test_func=ttest_rel):
+    df_mean = df.groupby(by1).mean(True)
+    df_std = df.groupby(by1).std(True).rename(lambda x: x+' std', axis=1)
+    df_aggr = pd.concat([df_mean, df_std], axis=1)
+    df_aggr = df_aggr.sort_index(axis=1)
+    # df_aggr = df_aggr.reset_index()
+    pvals = {}
+    tstats = {}
+    vals = [x for _,x in df.groupby(by1)]
+    for marker in df.columns:
+        if not is_numeric_dtype(df[marker]) or df[marker].dtype==bool: 
+            tstats[marker] = ['N/A']
+            pvals[marker] = ['N/A']
+            continue
+        stat, pval = test_func(vals[0][marker], vals[1][marker])
+        tstats[marker] = [stat]
+        pvals[marker] = [pval]
+    df_aggr = pd.concat([df_aggr, pd.DataFrame(tstats, index=['rel tstat'])], axis=0)
+    df_aggr = pd.concat([df_aggr, pd.DataFrame(pvals, index=['pvalue'])], axis=0)
 
+    return df_aggr
 
 folders_nights = []  # store all night folders for which we have two in here
 
@@ -42,7 +64,7 @@ for folder_subj in tqdm(folders_subj, desc='loading participant responses'):
 # asd
 #%% perform
 chs = ['Pz', 'CPz', 'P1', 'P2', 'POz']
-tqdm_loop = tqdm(total=len(folders_nights), desc='creating spectrograms')
+tqdm_loop = tqdm(total=len(folders_nights), desc='detecting spindles')
 
 df = pd.DataFrame()
 spindle_func = memory.cache(yasa.spindles_detect)
@@ -78,15 +100,16 @@ for folder in folders_nights:
     df_subj['Condition'] = night_type
     df_subj['Stage'] = df_subj['Stage'].apply(lambda x: stage_map[x])
 
-    df = pd.concat([df, df_subj])
+
+    df = pd.concat([df, df_subj], ignore_index=True)
     tqdm_loop.update()
-    
+df = df[~((df.Stage=='SWS') & (df.Subject=='PN03') & (df.Condition=='low'))]
 #%% Plot power values of participants  
 
 markers = ('Density', 'Duration', 'Amplitude', 'RMS', 'AbsPower', 'RelPower', 
            'Frequency', 'Oscillations', 'Symmetry')
 
-fig, axs = plotting.make_fig(len(markers))
+fig, axs = plt.subplots(3, 3); axs=axs.flatten()
  # plot all possible markers for low and high nights
 
 for i, marker in enumerate(markers):
@@ -99,9 +122,14 @@ for i, marker in enumerate(markers):
         vals2 = df[(df.Condition=='high') & (df.Stage==stage)][marker]
         _, p = ttest_rel(vals1, vals2)
         pvals[stage] = np.round(p, 3)
-    axs[i].set_title(f'{marker}, p={pvals}')
+    axs[i].set_xticks([0, 1], [f'{stage}\np={pvals[stage]:.3f}' for stage in df.Stage.unique()])
+    axs[i].set_title(f'{marker}')
 plt.suptitle(f'Spindle analysis per sleep stage using YASA algorithm n={len(df.Subject.unique())}')
 plt.pause(0.1)
 fig.tight_layout()
 plt.pause(0.1)
 fig.tight_layout()
+name = '4. Spindle analysis'
+fig.savefig(f'./results/{name}.png')
+df.sort_values(['Condition', 'Stage', 'Subject']).to_excel(f'./results/{name}_raw.xlsx')
+aggregate(df).to_excel(f'./results/{name}_stats.xlsx')

@@ -61,8 +61,6 @@
 
 ![](md_assets/2022-12-22-16-46-56-image.png)
 
-
-
 ## 2. Sleep Stage Analysis
 
 ### 2.1 Absolut Values
@@ -72,8 +70,6 @@
 **Result**: No significant difference between the two conditions low/high could be found in these absolute sleep markers.
 
 ![](md_assets/2022-12-23-09-22-07-image.png)
-
-
 
 ### 2.2 Sleep Cycle Markers
 
@@ -87,25 +83,17 @@
 
 ![](md_assets/2022-12-23-09-24-51-image.png)
 
-
-
 ### 2.3 Hypnogram summary for both conditions
 
 **Description**: By summarizing the hypnograms we can see how long each participant spent in which sleep stage. This is mainly useful for visualization.
 
 **Result**: We see that REM is quite prominent at the beginning of the recording. We would not expect that and I strongly believe this is due to a mistake of the sleep scoring algorithm USleep that we use. Sleep onset REM (SOREM) is usually only happening in Narcolepsia, and not common in health, rested participants.
 
-
-
 ![](md_assets/2022-12-23-09-41-04-image.png)
-
-
 
 ## 3. EEG Power analysis
 
 EEG power of certain brain bands can give insight into cognitive processing. Therefore, in sleep research power bands for common brain bands are calculated for each sleep stage. 
-
-
 
 ### 3.1 Power analysis per sleep stage
 
@@ -123,8 +111,6 @@ Beta: 16-30 Hz
 
 ![](md_assets/2022-12-23-11-03-16-image.png)
 
-
-
 ### 3.2 Power analysis per region
 
 **Description**: In the above analysis, all regions were combined into the same analysis.  However, analysis can also be performed per brain region to see if certain regions show more difference than others. For this analysis the same procedure as above is used, but the values are not normalized to sum to one, instead their total sum across all brain bands is taken (total band power). F=Frontal, T=Temporal, C=Central, P=Parietal, O=Occipital. For each participant, values were averaged by region and sleep stage and condition. That means the analysis contained 5x2 values for each participant for each sleep stage
@@ -133,14 +119,32 @@ Beta: 16-30 Hz
 
 ![](md_assets/2022-12-23-11-31-53-image.png)
 
-
-
 ## 4. Spindle analysis
 
 Sleep spindles are important markers for sleep research. There are different methods to automatically detect spindles. In these analysis I'm again using the package YASA, which implements this method of spindle detection that is most closely to a human scorer (however, some also argue that it would be better not to approximate a human, as they also make mistakes):  [A sleep spindle detection algorithm that emulates human expert spindle scoring,](https://linkinghub.elsevier.com/retrieve/pii/S0165027018302504)
 
-
-
 ### 4.1 Spindle results
 
-Description: For the spindle analysis I let YASA search for spindles in all channels surrounding `Pz`, i.e.`['Pz', 'CPz', 'P1', 'P2', 'POz']`. This is done to increase robustness and decrease errors due to artefacts in one of the channels. Spindles were only counted if they were detected in at least two different channels
+**Description**: For the spindle analysis I let YASA search for spindles in all channels surrounding `Pz`, i.e.`['Pz', 'CPz', 'P1', 'P2', 'POz']`. This is done to increase robustness and decrease errors due to artefacts in one of the channels. Spindles were only counted if they were detected in at least two different channels. The following markers have been used: 
+
+![](md_assets/2022-12-23-12-42-25-image.png)
+
+**Results**: No significant difference could be detected as determined by a relative ttest. The results for the density are extremely high, I'm not sure they are correct, a density of 15 events/minute is highly implausible. This is probably due to artefacts. 
+
+![](md_assets/2022-12-23-12-42-47-image.png)
+
+
+
+Example of the average spindle for PN10
+
+![](md_assets/2022-12-23-12-49-12-image.png)
+
+
+
+![](md_assets/2022-12-23-12-52-32-image.png)
+
+
+
+Example of a detected spindle of PN10
+
+![](md_assets/2022-12-23-12-49-49-image.png)
