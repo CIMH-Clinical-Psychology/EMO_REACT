@@ -60,3 +60,87 @@
 ![](md_assets/2022-12-22-16-46-38-image.png)
 
 ![](md_assets/2022-12-22-16-46-56-image.png)
+
+
+
+## 2. Sleep Stage Analysis
+
+### 2.1 Absolut Values
+
+**Description**: Sleep stages can be calculated in absolute values, that means in minutes that people spent in a certain sleep stage. Other markers include TST (total sleep time, time spend in all stages other than wake), TRT (total recording time, time from first sleep onset to sleep offest), WASO (wake after sleep onset, time spent awake inbetween TRT, basically TRT-TST).
+
+**Result**: No significant difference between the two conditions low/high could be found in these absolute sleep markers.
+
+![](md_assets/2022-12-23-09-22-07-image.png)
+
+
+
+### 2.2 Sleep Cycle Markers
+
+**Description**: Sleep stages can be analysed either as
+
+- absolute time spent in certain sleep stage, 
+- percentage of all sleep stages spent in specific stage
+- how long it took to reach a certain sleep stage (latency)
+
+**Results**: No significant difference could be detected in any of these measures. S1 latency was borderline significant, but this is generally a meaningless marker, as it is the first sleep stage anyway. What we see however is that the REM latency is very low for many participants. This is due to USleep, the automatic sleep staging algorithm that we use assigned REM quite often during the phase of falling asleep. This is a mistake and should be paid closer attention to in further studies
+
+![](md_assets/2022-12-23-09-24-51-image.png)
+
+
+
+### 2.3 Hypnogram summary for both conditions
+
+**Description**: By summarizing the hypnograms we can see how long each participant spent in which sleep stage. This is mainly useful for visualization.
+
+**Result**: We see that REM is quite prominent at the beginning of the recording. We would not expect that and I strongly believe this is due to a mistake of the sleep scoring algorithm USleep that we use. Sleep onset REM (SOREM) is usually only happening in Narcolepsia, and not common in health, rested participants.
+
+
+
+![](md_assets/2022-12-23-09-41-04-image.png)
+
+
+
+## 3. EEG Power analysis
+
+EEG power of certain brain bands can give insight into cognitive processing. Therefore, in sleep research power bands for common brain bands are calculated for each sleep stage. 
+
+
+
+### 3.1 Power analysis per sleep stage
+
+**Description**: Sleep EEGs were taken and subdivided into blocks of 4 seconds. Then for each block of 4 seconds, a Fourier transformation was performed. Then the 4 second blocks were split up according to their sleep stage and again averaged for each electrode. This analysis was performed with the help of the python package [YASA](). All power values were normalized so that they add up to 1. Note: Gamma band is probably not accurately measured, as this brain band overlaps with the cutoff-frequency of our low pass filter. Therefore it has been excluded in the analysis. Frequency bands are defined as follows.
+
+```
+Delta: 0.5-4 Hz
+Theta: 4-8 Hz
+Alpha: 8-12 Hz
+Sigma: 12-16 Hz
+Beta: 16-30 Hz
+```
+
+**Results**: The data was split up into the two conditions, then into the sleep stages, and finally into the different brain bands. Relative ttests were computed, comparing all electrode power values per sleep stage per band for the two conditions. There was significant increase in Alpha power during both NREM sleep stages in the high condition. Additionally, Sigma power was increased in REM and Beta power was increased in S2 It should be noted that the artefact detection was not very thorough, so there might be lots of artefacts in the data that bias the analysis. Power analysis is especially susceptible to artefacts in the EEG.
+
+![](md_assets/2022-12-23-11-03-16-image.png)
+
+
+
+### 3.2 Power analysis per region
+
+**Description**: In the above analysis, all regions were combined into the same analysis.  However, analysis can also be performed per brain region to see if certain regions show more difference than others. For this analysis the same procedure as above is used, but the values are not normalized to sum to one, instead their total sum across all brain bands is taken (total band power). F=Frontal, T=Temporal, C=Central, P=Parietal, O=Occipital. For each participant, values were averaged by region and sleep stage and condition. That means the analysis contained 5x2 values for each participant for each sleep stage
+
+**Results**: No significant difference in total power of the EEG for different sleep stages for different regions as determined by a relative ttest. This analysis could be further split up into different bands
+
+![](md_assets/2022-12-23-11-31-53-image.png)
+
+
+
+## 4. Spindle analysis
+
+Sleep spindles are important markers for sleep research. There are different methods to automatically detect spindles. In these analysis I'm again using the package YASA, which implements this method of spindle detection that is most closely to a human scorer (however, some also argue that it would be better not to approximate a human, as they also make mistakes):  [A sleep spindle detection algorithm that emulates human expert spindle scoring,](https://linkinghub.elsevier.com/retrieve/pii/S0165027018302504)
+
+
+
+### 4.1 Spindle results
+
+Description: For the spindle analysis I let YASA search for spindles in all channels surrounding `Pz`, i.e.`['Pz', 'CPz', 'P1', 'P2', 'POz']`. This is done to increase robustness and decrease errors due to artefacts in one of the channels. Spindles were only counted if they were detected in at least two different channels

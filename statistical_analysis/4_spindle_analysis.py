@@ -14,13 +14,13 @@ from settings import stage_map
 import data_loading
 import plotting
 import yasa
-import utils
 from tqdm import tqdm
 from scipy.stats import ttest_rel
 import numpy as np
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, Memory
 import matplotlib.pyplot as plt
 sns.set(font_scale=1.2)
+memory = Memory(settings.cache_dir)
 
 # check which data is loadable
 folders_subj = ospath.list_folders(f'{settings.data_dir}/Raw_data/', pattern='PN*')
@@ -41,10 +41,11 @@ for folder_subj in tqdm(folders_subj, desc='loading participant responses'):
 
 # asd
 #%% perform
-
+chs = ['Pz', 'CPz', 'P1', 'P2', 'POz']
 tqdm_loop = tqdm(total=len(folders_nights), desc='creating spectrograms')
 
 df = pd.DataFrame()
+spindle_func = memory.cache(yasa.spindles_detect)
 
 # loop over all experimental nights that are included
 for folder in folders_nights:
@@ -58,7 +59,6 @@ for folder in folders_nights:
     # we load the file into memory using the function `utils.read_edf`
     raw = data_loading.load_sleep(folder)
 
-    
     # now load the hypnogram that fits to this data
     hypno = data_loading.get_hypno(folder)
     hypno_upsampled = yasa.hypno_upsample_to_data(hypno, sf_hypno=1/30, data=raw)
@@ -70,8 +70,9 @@ for folder in folders_nights:
     # go through the stages and stage combinations that we want
 
     ch2region = lambda x: x[0] if not 'E' in x else x[-3:]
-    
-    spindle_res = yasa.spindles_detect(raw, include=(2, 3), hypno=hypno_upsampled)
+    raw.drop_channels([ch for ch in raw.ch_names if not ch in chs])
+    spindle_res = spindle_func(raw, include=(2, 3), ch_names=chs,
+                               hypno=hypno_upsampled, multi_only=True)
     df_subj = spindle_res.summary(grp_stage=True).reset_index()
     df_subj['Subject'] = subj
     df_subj['Condition'] = night_type
@@ -100,5 +101,7 @@ for i, marker in enumerate(markers):
         pvals[stage] = np.round(p, 3)
     axs[i].set_title(f'{marker}, p={pvals}')
 plt.suptitle(f'Spindle analysis per sleep stage using YASA algorithm n={len(df.Subject.unique())}')
-plt.pause(0.1)  
-plt.tight_layout()
+plt.pause(0.1)
+fig.tight_layout()
+plt.pause(0.1)
+fig.tight_layout()
