@@ -1,14 +1,21 @@
 # Emo React - Analysis
 
-- [Emo React - Analysis](#emo-react---analysis)
-  * [1. Behavioural Analysis](#1-behavioural-analysis)
-    + [1.1 Memory Performance old/new](#11-memory-performance-old-new)
-    + [1.2 Memory performance quadrant](#12-memory-performance-quadrant)
-    + [1.3 Subjective ratings vs OASIS ratings](#13-subjective-ratings-vs-oasis-ratings)
-    + [1.4  Subjective arousal ratings for different nights](#14--subjective-arousal-ratings-for-different-nights)
-    + [1.5 Subjective valence ratings for different nights](#15-subjective-valence-ratings-for-different-nights)
-    + [1.6 Image category effect on ratings](#16-image-category-effect-on-ratings)
-
+- [1. Behavioural Analysis](#1-behavioural-analysis)
+  * [1.1 Memory Performance old/new](#11-memory-performance-old-new)
+  * [1.2 Memory performance quadrant](#12-memory-performance-quadrant)
+  * [1.3 Subjective ratings vs OASIS ratings](#13-subjective-ratings-vs-oasis-ratings)
+  * [1.4  Subjective arousal ratings for different nights](#14--subjective-arousal-ratings-for-different-nights)
+  * [1.5 Subjective valence ratings for different nights](#15-subjective-valence-ratings-for-different-nights)
+  * [1.6 Image category effect on ratings](#16-image-category-effect-on-ratings)
+- [2. Sleep Stage Analysis](#2-sleep-stage-analysis)
+  * [2.1 Absolut Values](#21-absolut-values)
+  * [2.2 Sleep Cycle Markers](#22-sleep-cycle-markers)
+  * [2.3 Hypnogram summary for both conditions](#23-hypnogram-summary-for-both-conditions)
+- [3. EEG Power analysis](#3-eeg-power-analysis)
+  * [3.1 Power analysis per sleep stage](#31-power-analysis-per-sleep-stage)
+  * [3.2 Power analysis per region](#32-power-analysis-per-region)
+- [4. Spindle analysis](#4-spindle-analysis)
+  * [4.1 Spindle results](#41-spindle-results)
 ## 1. Behavioural Analysis
 
 ### 1.1 Memory Performance old/new
@@ -133,17 +140,11 @@ Sleep spindles are important markers for sleep research. There are different met
 
 ![](md_assets/2022-12-23-12-42-47-image.png)
 
-
-
 Example of the average spindle for PN10
 
 ![](md_assets/2022-12-23-12-49-12-image.png)
 
-
-
 ![](md_assets/2022-12-23-12-52-32-image.png)
-
-
 
 Example of a detected spindle of PN10
 
