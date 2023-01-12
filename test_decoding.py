@@ -15,7 +15,6 @@ from sklearn.svm import SVR, SVC
 from sklearn.metrics import mean_squared_error, make_scorer
 from sklearn.pipeline import make_pipeline
 import numpy as np
-from data_loading import load_localizer
 import matplotlib.pyplot as plt
 from mne.decoding import (SlidingEstimator, GeneralizingEstimator, Scaler,
                           cross_val_multiscore, LinearModel, get_coef,
@@ -41,114 +40,157 @@ from scipy.ndimage import gaussian_filter
 
 import settings
 import plotting
-
-print(__doc__)
-
-#%% settings
-mse = make_scorer(mean_squared_error, greater_is_better=False)
-# scoring = make_scorer(f1_score, average='macro')
-kwargs = dict(n_jobs=-1, scoring='accuracy')
-
-clf_rfr = SlidingEstimator(RandomForestRegressor(1000), **kwargs)
-clf_rfc = SlidingEstimator(RandomForestClassifier(1000), **kwargs)
-clf_svr = SlidingEstimator(SVR(), **kwargs)
-clf_svc = SlidingEstimator(SVC( class_weight='balanced'), **kwargs)
-clf_log = SlidingEstimator(LogisticRegression(C=10, penalty='l1', class_weight='balanced',
-                                               solver='liblinear', max_iter=1000), 
-                          **kwargs)
-csp = CSP(n_components=3, norm_trace=False)
-clf_csp = make_pipeline(csp,
-                        LinearModel(LogisticRegression(solver='liblinear'))
-                        )
+from data_loading import get_night, get_learning_type, get_subj
+from data_loading import load_localizer
+import yasa
 
 
-clfs = {
-        # 'CSP': clf_csp,
-        # 'SVR': clf_svr,
-        f'SVC-{C}':clf_svc for C in [0.1, 1, 10, 100]
-        # 'RFR': clf_rfr, 
-        # 'RFC':clf_rfc,
-        # 'LogReg': clf_log
-        }
-colors = sns.color_palette()
 
 #%% data loading
+# this cell loads the data of the localizers into memory
 
-folders = ospath.list_folders(f'{settings.data_dir}/Raw_data/', pattern='*night*', recursive=True)
+# list all folders in the data_dir
+# the location of the data_dir has to be defined in the settings.py
+# for each individual host machine
+folders_subj = ospath.list_folders(f'{settings.data_dir}/Raw_data/', pattern='PN*')
 
-sfreq = 100
-tmin= -1
-tmax = 2
+#  settings for data loading
+sfreq = 100  # sampling frequency that signals will be downsampled to
+tmin= -1     # time before stimulus onset that is loaded in seconds
+tmax = 2     # time after stimulus onset that is loaded in seconds
 
-data = {}
+data = {}   # this variable will hold all data
 
-for folder in tqdm(folders, desc='loading localizer data'):
-    night = settings.get_night(folder)
-    try:
-        res = load_localizer(folder, sfreq=sfreq, tmin=tmin, tmax=tmax, event_id=trigger.STIMULUS)
-        times, data_x, data_y = res
-        data[night] = times, data_x, data_y
-    except:
-        print(f'ERROR: {folder}')
+for folder in tqdm(folders_subj, desc='loading participant localizers'):
+    # in each folder there are two separate recording days/nights
+    nights_folders = ospath.list_folders(folder, pattern='*night*')
+    # retrieve name of subject, i.e. "PN05"
+    subj = get_subj(folder)
+    # for each subject, load the two experiment days
+    for folder_night in nights_folders:
+        # retrieve which learning type we have: low or high arousal images
+        night = get_learning_type(folder_night)
+        # load the data of the localizer of that specific day
+        times, data_x, data_y  = load_localizer(folder_night, sfreq=sfreq,
+                             tmin=tmin, tmax=tmax, event_id=trigger.STIMULUS)
+        # n_epochs = ie. ~96 minus rejected epochs
+        # n_samples = ie. ~301 msamples, 3.01 seconds with 100 Hz
+        # times  = array of size(n_samples, ) times in seconds for each sample
+        # data_x = array of size(n_epochs, n_electrodes, n_samples)
+        # data_y = dictionary with 5 different entries:
+        #          each entry has size (n_epochs, )
+        #           valence_subj: the ratings that this participant gave for the image shown in the specific epoch
+        #           valence_mean: the mean rating of 100 OASIS participants for the image shown in the specific epoch
+        #           arousal_subj: the ratings that this participant gave for the image shown in the specific epoch
+        #           arousal_mean: the mean rating of 100 OASIS participants for the image shown in the specific epoch
+        #           img_category: the image category of the images, i.e. object, animal, person, scene
 
+        # save data in the data dictionary, for later access
+        data[f'{subj}-{night}'] = times, data_x, data_y
+    # except:
+        # print(f'ERROR: {folder}')
+
+
+
+
+#%% settings
+
+# mse = make_scorer(mean_squared_error, greater_is_better=False)
+
+# for now, use e.g. RandomForestClassifier or SVM classifiers or LogReg
+# clf = RandomForestClassifier(200)
+# clf = SVC()
+clf = LogisticRegression(penalty='l1', C=1/1, solver='liblinear')
+
+
+# parallelize the classifier to run on 3D arrays of (n_epochs, n_electrodes, n_samples)
+# SlidingEstimator simply creates an individual classifier for each element
+# in the last dimension (ie. time dimension)
+clf = SlidingEstimator(clf, n_jobs=-1, scoring='f1_macro')
+
+# these are the thresholds for binarization of the values,
+# i.e. mapping from 0-4 => false/true, or in other words low/high
+thresholds = {'valence_subj':2, 'arousal_subj':2,
+              'valence_mean':3, 'arousal_mean':3}
+
+# this is a stop sign to make the script not execute the rest of the file
 stop
 
+#%% try: raw electrode values
+# the most simple approach: using raw sensor values without any
+# feature extraction. This works well with another paradigm that we are using
+# that uses MEG data and displays images. As the image onset is very sharp
+# this works well for the image categories. But probably emotional reactions
+# are not very time specific and can happen slower or faster, so we cannot
+# use this approach for decoding arousal/valence
 
-#%% run calculations
-# plt.maximize=False
-
+# open a plot with `axs` for the individual localizers, and a bottom plot summary
 fig, axs, ax_b = plotting.make_fig(len(data), n_bottom=[0,0,1])
 
+# save results of all participants in this data frame
 df = pd.DataFrame()
 
-for i, night in enumerate(tqdm(data, desc='subj')):
-    times, data_x, data_y = data[night]
-    
-    subj = settings.get_subj(night)
-    train_x = zscore(data_x, axis=2)
-    
-    
-    thresh = {'valence_subj':0, 'arousal_subj':2,
-              'valence_mean':3, 'arousal_mean':3,
-              'img_category':-1}
+# loop over all localizer data, i.e. "PN01-low" or "PN07-high"
+for i, day_desc in enumerate(tqdm(data, desc='subj')):
+    times, data_x, data_y = data[day_desc]
 
-    masks = {t:(v<thresh[t]) | (v>thresh[t]) for t, v in data_y.items()}
-    
+    subj = get_subj(day_desc)
+
+    # zscore data across time
+    train_x = zscore(data_x, axis=2)
+
+    # save results of current participant and day in this dataframe
     df_subj = pd.DataFrame()
     for target, train_y in data_y.items():
-        train_x_sel = train_x.copy()[masks[target]]
-        train_y_sel = train_y[masks[target]]        
-        if target!='img_category':
-            train_y_sel = train_y_sel>thresh[target]
-        if any(np.bincount(train_y_sel)<5):
-            print(f'Too few values in classes: {night} {target=} {np.bincount(train_y_sel)}')
+
+        # binarize the train_y from 0-4 => low/high
+        if target in thresholds:
+            train_y = train_y.copy() # create copy to not overwrite anything
+            train_y = train_y>thresholds[target]
+
+        # sanity check: if there are fewer than 5 values in any class
+        # skip this day. This can happen if a participant rates
+        # all 96 epochs as 0 or 1
+        if any(np.bincount(train_y)<5):
+            print(f'Too few values in classes: {day_desc} {target=} '\
+                  f'{np.bincount(train_y)}')
             continue
-        for clf_name, clf in clfs.items():
-            # try:
-                scores = cross_val_multiscore(clf, train_x_sel, train_y_sel, n_jobs=1, cv=5, 
-                                              verbose=False)
-                scores = gaussian_filter(scores, (0, 2))
-                
-                df_tmp = pd.DataFrame({f'{scoring._score_func.__name__}': scores.ravel(),
-                                       'timepoint': [x for x in times]*5,
-                                       'night': night,
-                                       'clf': clf_name,
-                                       'target': target})
-                df_subj = pd.concat([df_subj, df_tmp], ignore_index=True)
-            # except:
-                # pass
-    # for target in train_ys:
-    #     df_target = df_subj.groupby('target').get_group(target)
-    #     sns.lineplot(data=df_target, x='timepoint', y=scoring, ax=axs[i], errorbar='sd')
-    if len(df_subj)>0:
-        sns.lineplot(data=df_subj, x='timepoint', y=scoring._score_func.__name__, 
-                     hue='target', ax=axs[i], errorbar='sd')
-        df = pd.concat([df, df_subj], ignore_index=True)
-    
-sns.lineplot(data=df[df['target']!='img_category'], x='timepoint', y=f'{scoring._score_func.__name__}', hue='target')
-sns.lineplot(data=df, x='timepoint', y=f'{scoring._score_func.__name__}', hue='target')
+
+        # run classification
+        # cross_val_multiscore runs a cross validation on the data with
+        # 5 folds and returns the score, i.e. the accuracy
+        cv = StratifiedKFold(5)  # stratified keeps classes in the same balance across folds
+        # NB: using f1-score as classes are imbalanced
+        scores = cross_val_multiscore(clf, train_x, train_y, cv=cv)
+
+        # apply gaussian smoothing to make lines a bit less noisy.
+        # this should not be done in the final classifier/paper
+        # just to get a better feeling if something happens or not
+        scores = gaussian_filter(scores, (0, 1.3))
+
+        # create temporary dataframe with results
+        df_tmp = pd.DataFrame({'f1_macro': scores.ravel(),
+                               'timepoint': [x for x in times]*5,
+                               'desc': day_desc,
+                               'target': target})
+        df_subj = pd.concat([df_subj, df_tmp], ignore_index=True)
+
+    # plot current subject
+    sns.lineplot(data=df_subj, x='timepoint', y='f1_macro',
+                 hue='target', ax=axs[i], errorbar='sd')
+    df = pd.concat([df, df_subj], ignore_index=True)
+    plt.pause(0.1)
+
+    # print mean of all subjects
+    ax_b.clear()
+    sns.lineplot(data=df, x='timepoint', y='f1_macro', hue='target', ax=ax_b)
+    fig.tight_layout()
 
 #%% try frequency bands
+# a bit more sophisticated approach: transform into frequency bands
+# the most simple case here would be to transform into frequency space
+# and to bin the results according to common brain bands delta beta alpha etc
+
 import features
 fig, axs, ax_b = plotting.make_fig(len(data), n_bottom=[0,0,1])
 
@@ -157,29 +199,29 @@ df = pd.DataFrame()
 for i, night in enumerate(tqdm(data, desc='subj')):
     times, data_x, data_y = data[night]
     data_y = data_y.copy()
-    
+
     subj = settings.get_subj(night)
-    
+
     times, bands = features.get_bands(data_x, tstep=0.25, n_pca=False, wlen=1, relative=False)
-    
+
     df_subj = pd.DataFrame()
-    
+
     for target, train_y in data_y.items():
         y = train_y.copy()
-
-        if 'subj' in target: 
+        stop
+        if 'subj' in target:
             continue
-                
+
         if target!='img_category':
             l, u = np.quantile(np.hstack([d[-1][target] for d in data.values()]), [0.2, 0.8])
             y[y<=l], y[(l<y) & (u>y)], y[y>=u] = 0, 1, 2
 
         for clf_name, clf in clfs.items():
 
-            scores = cross_val_multiscore(clf, bands, y, n_jobs=5, cv=5, 
+            scores = cross_val_multiscore(clf, bands, y, n_jobs=5, cv=5,
                                           verbose=False)
             # scores = gaussian_filter(scores, (0, 2))
-            
+
             df_tmp = pd.DataFrame({'accuracy': scores.ravel(),
                                    'timepoint': [x for x in times-0.5]*5,
                                    'night': night,
@@ -192,137 +234,6 @@ for i, night in enumerate(tqdm(data, desc='subj')):
                      hue='target', ax=axs[i], errorbar='sd')
         df = pd.concat([df, df_subj], ignore_index=True)
     plt.pause(0.1)
-    
+
 # sns.lineplot(data=df[df['target']!='img_category'], x='timepoint', y='accuracy', hue='target')
 sns.lineplot(data=df, x='timepoint', y='accuracy', hue='target', style='clf')
-
-#%% try PyRiemann
-from pyriemann.estimation import Covariances
-from pyriemann.tangentspace import TangentSpace
-
-from sklearn.pipeline import make_pipeline
-from sklearn.svm import SVC
-from sklearn.model_selection import cross_val_score
-
-fig, axs, ax_b = plotting.make_fig(len(data), n_bottom=[0,0,1])
-
-# load your data
-
-wlen = 20
-
-accs = []
-df = pd.DataFrame()
-for i, night in enumerate(tqdm(data, desc='subj')):
-    times, data_x, data_y = data[night]
-    
-    # subj = settings.get_subj(night)
- 
-    data_x = data_x[:,:,:]
-    # build your pipeline
-    covest = Covariances('oas')
-    ts = TangentSpace()
-    svc = SVC(kernel='linear')
-    clf = make_pipeline(covest, ts, svc)
-
-    for target, train_y in data_y.items():
-        if target=='img_category': continue
-        # cross validation
-        for t in np.arange(0, data_x.shape[-1]-wlen, 10):
-            train_x = data_x[:,:,t:t+wlen]
-            accuracy = cross_val_score(clf, train_x, train_y.round().astype(int), cv=5, n_jobs=-1)
-            df_tmp = pd.DataFrame({'accuracy': accuracy.mean(),
-                                   'target': target,
-                                   'night': night,
-                                   'wlen': wlen,
-                                   'timepoint': t/100-0.5}, index=[0])
-            df = pd.concat([df, df_tmp], ignore_index=True)            
-    ax = axs[i]
-    
-    sns.lineplot(data=df[df['night']==night], x='timepoint', y='accuracy', hue='target', ax=ax)
-    plt.pause(0.01)
-    
-sns.lineplot(data=df, x='timepoint', y='accuracy', hue='target', ax=ax_b)
-    
-#%% try TPOTClassifier
-#  see also https://epistasislab.github.io/tpot/api/
-from tpot import TPOTClassifier
-from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
-
-digits = load_digits()
-X_train, X_test, y_train, y_test = train_test_split(digits.data, digits.target,
-                                                    train_size=0.75, test_size=0.25)
-
-pipeline_optimizer = TPOTClassifier(generations=5, population_size=20, cv=5,
-                                    random_state=42, verbosity=2)
-pipeline_optimizer.fit(X_train, y_train)
-print(pipeline_optimizer.score(X_test, y_test))
-pipeline_optimizer.export('tpot_exported_pipeline.py')
-#%% try XDAWN
-tmin = -0.1
-tmax = 0.5
-sfreq = 150
-for folder in folders[:1]:
-    fig, axs = plt.subplots(2, 2, figsize=[5,8]); axs=axs.flatten()
-    
-    fig.suptitle(f'Classifier Target: VALENCE & AROUSAL \n {folder}\n{sfreq=}')
-    
-    tqdm_loop = tqdm(total=2*len(clfs))
-    epochs, (train_y_valence, train_y_arousal) = load_localizer(folder, sfreq=sfreq,
-                                                                     tmin=tmin, tmax=tmax, 
-                                                                     event_id=trigger.STIMULUS,
-                                                                     return_epochs=True)
-    epochs.load_data()
-
-    epochs.filter(1, 30, fir_design='firwin')
-    eeg_channels = mne.pick_types(epochs.info, eeg=True)
-    epochs.pick(eeg_channels)
-    
-    mask = (np.abs(train_y_valence)!=2) & (train_y_arousal>1)
-    epochs = epochs[mask]
-   
-    train_y_valence = train_y_valence[mask]
-    train_y_arousal = train_y_arousal[mask]
-    
-    # epochs = zscore(epochs, axis=2)
-    
-    clf = make_pipeline(Xdawn(n_components=10),
-                        Vectorizer(),
-                        MinMaxScaler(),
-                        LogisticRegression(penalty='l1', solver='liblinear',
-                                           multi_class='auto'))
-
-    
-    # Cross validator
-    
-    
-    cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
-    for name, target in {'valence':train_y_valence, 'arousal':train_y_arousal}.items():
-        # Do cross-validation
-        preds = np.empty(len(target))
-        for train, test in cv.split(epochs, target):
-            clf.fit(epochs[train], target[train])
-            preds[test] = clf.predict(epochs[test])
-    
-        
-        # Classification report
-        # target_names = ['aud_l', 'aud_r', 'vis_l', 'vis_r']
-        target_names = np.unique(target)
-        # report = classification_report(labels, preds, target_names=target_names)
-        # print(report)
-        
-        # Normalized confusion matrix
-        cm = confusion_matrix(target, preds)
-        cm_normalized = cm.astype(float) / cm.sum(axis=1)[:, np.newaxis]
-        
-        # Plot confusion matrix
-        fig, ax = plt.subplots(1)
-        im = ax.imshow(cm_normalized, interpolation='nearest', cmap=plt.cm.Blues)
-        ax.set(title='Normalized Confusion matrix')
-        fig.colorbar(im)
-        tick_marks = np.arange(len(target_names))
-        plt.xticks(tick_marks, target_names, rotation=45)
-        plt.yticks(tick_marks, target_names)
-        fig.tight_layout()
-        ax.set(ylabel='True label', xlabel='Predicted label')
-        fig.suptitle(f'{name}')

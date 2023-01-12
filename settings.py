@@ -12,6 +12,13 @@ import getpass
 import platform
 from enum import IntEnum, unique
 
+def clear(locals, remove):
+    """clear a set of variables from local namespace"""
+    for var in remove:
+        if var in locals:
+            del locals[var]
+
+
 @unique
 class trigger(IntEnum):
     """Trigger values that are present in the recordings"""
@@ -27,13 +34,13 @@ class trigger(IntEnum):
 @unique
 class image_categories(IntEnum):
     """Trigger values that are present in the recordings"""
-    Object = 1
-    Scene = 2
-    Animal = 3
-    Person = 4
+    Object = 0
+    Scene = 1
+    Animal = 2
+    Person = 3
 
 rating_map = {49:0,   # Very Happy  |  Very Arousing
-              50:1, 
+              50:1,
               51:2,
               52:3,
               53:4,   # Very Sad    |  Not arousing at all
@@ -51,7 +58,7 @@ quad_map = {97: 4,    # lower left
 stage_map = {1: 'S1', 2:'S2', 3:'SWS', 4:'REM', 0:'Wake'}
 
 ref_ch = 'FCz'  # reference channel used in the sleep lab
-   
+
 
 use_caching = False
 
@@ -64,20 +71,24 @@ home = ospath.expanduser('~')
 
 
     # pass
-cache_dir = None  
+cache_dir = None
 data_dir = None
-      
+
 if username == 'simon' and host=='desktop-simon':
     data_dir = 'z:/Emo_React/'
     cache_dir = 'z:/cache/emo-react/'
     # plot_dir = ospath.expanduser('~/Nextcloud/ZI/2020.1 Pilotstudie/plots/')
     # log_dir = ospath.expanduser('~/Nextcloud/ZI/2020.1 Pilotstudie/plots/logs/')
     # results_dir = ospath.expanduser('~/Nextcloud/ZI/2020.1 Pilotstudie/results/')
-    
+
 elif username == 'simon.kern' and host=='zilxap29':
     data_dir = '/data/Emo_React/'
     cache_dir = f'{home}/joblib-cache/emo-react/'
-    
+
+elif username == 'simon' and host=='simon-kubuntu':
+    data_dir = '/data/Emo_React/'
+    cache_dir = f'{home}/joblib-cache/emo-react/'
+
 else:
     raise Exception(f'No profile found for {username} @ {host}')
 # elif username == 'simon' and host=='laptop-simon':
@@ -89,5 +100,10 @@ else:
 montage_file = f'{data_dir}/montages/montage.bvef'
 if not os.path.exists(montage_file):
     montage_file = './resources/montage.bvef'
+if not os.path.exists(montage_file):
+    montage_file = '../resources/montage.bvef'
+
+if not os.path.exists(montage_file):
+    raise FileNotFoundError('montage file `montage.bvef` not found')
 
 os.makedirs(cache_dir, exist_ok=True)
