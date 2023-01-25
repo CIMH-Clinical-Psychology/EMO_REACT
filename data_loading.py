@@ -358,6 +358,8 @@ def load_localizer_responses(folder):
                            'arousal': rating_map[int(arousal)]}
     return pd.DataFrame(resp_info).transpose()
 
+#%% Loading functions for EEG loading
+
 def load_test_responses(folder, which='BS'):
     files_mat = ospath.list_files(folder, patterns=f'*{which}.mat')
     assert len(files_mat)==1, f'more or fewer mat files: {files_mat} for {folder=}'
@@ -467,7 +469,7 @@ def load_localizer(folder, sfreq=100, event_id=2, tmin=-0.5, tmax=1.5,
                         preload=True, verbose='WARNING')
     events_hash = hash_array(epochs.events[:,0])
 
-    fdescriptor = f'{settings.cache_dir}/get_file_descriptor(raw.filenames[0])'
+    fdescriptor = f'{settings.cache_dir}/{get_file_descriptor(raw.filenames[0])}'
     epochs_file = f'{fdescriptor}-{tmin}-{tmax}-{events_hash}-epochs.pkl.gz'
     epochs, idx_removed = repair_epochs_autoreject(epochs, epochs_file)
     data_x = epochs.get_data()
@@ -488,6 +490,79 @@ def load_localizer(folder, sfreq=100, event_id=2, tmin=-0.5, tmax=1.5,
     assert np.all(valence_subj>=0)
     assert np.all(arousal_subj<=4)
     assert np.all(arousal_subj>=0)
+    assert all([len(data_x)==len(y) for y in data_y.values()]), 'unequal number of trials and ratings'
+
+    if return_epochs:
+        return epochs, data_y
+    return epochs.times, data_x, data_y
+
+
+def load_test(folder, which, sfreq=100, event_id=2, tmin=-0.5, tmax=1.5,
+              return_epochs=False):
+    """
+    function to load the image presentation during testing
+
+    Parameters
+    ----------
+    folder : str
+        link to participant night.
+    which : str
+        either 'before' or 'after' => Before Sleep or After Sleep test.
+    sfreq : int, optional
+        downsample to this frequency. The default is 100.
+    event_id : TYPE, optional
+        load images from this id. The default is 2.
+    tmin : float, optional
+        seconds before trigger onset to load. The default is -0.5.
+    tmax : float, optional
+        seconds after the trigger onset to load. The default is 1.5.
+    return_epochs : bool, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    np.array
+        array of size (n_trials, n_channels, n_times).
+    """
+    assert which in ['before', 'after'], 'which must be either before or after'
+    files_vhdr = ospath.list_files(folder, patterns=f'*{which}*.vhdr')
+    assert len(files_vhdr)==1, f'too many or too few localizer vhdr files: {files_vhdr=}'
+
+    # load the raw data into memory and extract events
+    raw = load_raw_and_preprocess(files_vhdr[0], sfreq=sfreq)
+    events, events_dict = mne.events_from_annotations(raw, verbose='WARNING')
+
+    # load responses of this participant for this test session
+    test_resp = load_test_responses(folder, which='BS' if which=='before' else 'AS')
+
+    # cut data into epochs
+    epochs = mne.Epochs(raw, events, event_id=event_id, tmin=tmin, tmax=tmax,
+                        preload=True, verbose='WARNING')
+
+
+
+    # reject bad epochs, repair rescuable ones
+    events_hash = hash_array(epochs.events[:,0]) # create unique hash on event values
+    fdescriptor = f'{settings.cache_dir}/get_file_descriptor(raw.filenames[0])'
+    epochs_file = f'{fdescriptor}-{tmin}-{tmax}-{events_hash}-epochs.pkl.gz'
+    epochs, idx_removed = repair_epochs_autoreject(epochs, epochs_file)
+    data_x = epochs.get_data()
+
+    # convert to categorical
+    img_category = [settings.image_categories[cat] for cat in test_resp.img_category]
+
+    # put all possible target values in a dictionary
+    data_y = {'seen_before_truth': test_resp.seen_before,
+              'quad_truth': test_resp.quad_resp,
+              'seen_before_response': test_resp.seen_before_resp,
+              'quad_resp': test_resp.quad_resp,
+              'valence_mean': test_resp.valence_mean,
+              'arousal_mean': test_resp.arousal_mean,
+              'img_category': img_category}
+
+    data_y = {k: np.array([v for i, v in enumerate(data_y[k]) if i not in idx_removed])
+              for k in data_y}
+
     assert all([len(data_x)==len(y) for y in data_y.values()]), 'unequal number of trials and ratings'
 
     if return_epochs:
