@@ -14,6 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVR, SVC
 from sklearn.metrics import mean_squared_error, make_scorer
 from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score
 import numpy as np
 import matplotlib.pyplot as plt
 from mne.decoding import (SlidingEstimator, GeneralizingEstimator, Scaler,
@@ -41,7 +42,7 @@ from scipy.ndimage import gaussian_filter
 import settings
 import plotting
 from data_loading import get_night, get_learning_type, get_subj
-from data_loading import load_localizer
+from data_loading import load_localizer, load_test
 import yasa
 
 
@@ -59,7 +60,8 @@ sfreq = 100  # sampling frequency that signals will be downsampled to
 tmin= -1     # time before stimulus onset that is loaded in seconds
 tmax = 2     # time after stimulus onset that is loaded in seconds
 
-data = {}   # this variable will hold all data
+data = {}   # this variable will hold all data of the localizer
+data_test = {}  # dictionary to hold the data of testing
 
 for folder in tqdm(folders_subj, desc='loading participant localizers'):
     # in each folder there are two separate recording days/nights
@@ -73,6 +75,7 @@ for folder in tqdm(folders_subj, desc='loading participant localizers'):
         # load the data of the localizer of that specific day
         times, data_x, data_y  = load_localizer(folder_night, sfreq=sfreq,
                              tmin=tmin, tmax=tmax, event_id=trigger.STIMULUS)
+
         # n_epochs = ie. ~96 minus rejected epochs
         # n_samples = ie. ~301 msamples, 3.01 seconds with 100 Hz
         # times  = array of size(n_samples, ) times in seconds for each sample
@@ -87,6 +90,12 @@ for folder in tqdm(folders_subj, desc='loading participant localizers'):
 
         # save data in the data dictionary, for later access
         data[f'{subj}-{night}'] = times, data_x, data_y
+
+        for which in ['before', 'after']: # also load the data of the test session
+            times, data_x, data_y  = load_test(folder_night, which=which, sfreq=sfreq,
+                                               tmin=tmin, tmax=tmax, event_id=trigger.STIMULUS)
+
+            data_test[f'{subj}-{night}-{which}'] = times, data_x, data_y
     # except:
         # print(f'ERROR: {folder}')
 
@@ -185,13 +194,86 @@ for i, day_desc in enumerate(tqdm(data, desc='subj')):
     ax_b.clear()
     sns.lineplot(data=df, x='timepoint', y='f1_macro', hue='target', ax=ax_b)
     fig.tight_layout()
+#%% use mne_features on data from TEST
+# here we try to classify during the test whether the images have been seen before
+# or whether the images were novel to the participant
 
+from mne_features.feature_extraction import extract_features
+
+fig, axs, ax_b = plotting.make_fig(len(data), n_bottom=[0,0,1])
+
+df = pd.DataFrame()
+
+# define the feature names that we want to extract
+# these is the exhaustive list of all features that can be extracted
+features = ['app_entropy', 'decorr_time', 'energy_freq_bands', 'higuchi_fd',
+            'hjorth_complexity', 'hjorth_complexity_spect', 'hjorth_mobility',
+            'hjorth_mobility_spect', 'hurst_exp', 'katz_fd', 'kurtosis',
+            'line_length', 'mean', 'pow_freq_bands', 'ptp_amp', 'quantile',
+            'rms', 'samp_entropy', 'skewness', 'spect_edge_freq',
+            'spect_entropy', 'spect_slope', 'std', 'svd_entropy', 'svd_fisher_info',
+            'teager_kaiser_energy', 'variance', 'wavelet_coef_energy', 'zero_crossings']
+
+# these are the targets we are going to use here
+# only categorical targets, that makes it a bit easier
+targets = ['seen_before_truth', 'quad_truth', 'seen_before_response',
+           'quad_resp', 'img_category']
+
+# these are the frequency bands that we want to extract.
+# is is only relevant for energy_freq_bands and pow_freq_bands
+bands = np.array([0.5, 4, 8, 13, 30])
+
+# use this classifier for now
+clf = LogisticRegression(penalty='l1', C=1/1, solver='liblinear')
+
+for i, which_test in enumerate(tqdm(data_test, desc='subj')):
+    times, data_x, data_y = data_test[which_test]
+    data_y = data_y.copy()
+
+    # get name of subject
+
+    # extract all univarate features that were defined above
+    # will take a few seconds/minutes
+    # this feature extraction will transform the data from a 3D matrix to 2D
+    # that means, we will lose the time dimension
+    train_x = extract_features(data_x, sfreq, features,
+                                # weird format that the parameter needs to be passed by
+                                funcs_params={'energy_freq_bands__freq_bands':bands,
+                                              'pow_freq_bands__freq_bands': bands})
+    # now we have a ton of features and need to do some feature reduction
+    # currently we are extracting >3000 features
+
+    # ... apply eg PCA() for feature reduction, insert code here
+
+
+    df_subj = pd.DataFrame()
+    for target in targets:
+        train_y = data_y[target].copy()
+        train_y[np.isnan(train_y)] = -1  # transform possible NaN values to -1
+        cv = StratifiedKFold()
+        scores = cross_val_score(clf, train_x, train_y, cv=cv, scoring='f1_macro')
+        df_tmp = pd.DataFrame({'score': scores.ravel(),
+                               'which_test': which_test,
+                               'clf': str(clf),
+                               'target': target})
+        df_subj = pd.concat([df_subj, df_tmp], ignore_index=True)
+
+    if len(df_subj)>0:
+        sns.lineplot(data=df_subj, x='timepoint', y='score' ,
+                     hue='target', ax=axs[i], errorbar='sd')
+        df = pd.concat([df, df_subj], ignore_index=True)
+    plt.pause(0.1)
+
+# sns.lineplot(data=df[df['target']!='img_category'], x='timepoint', y='accuracy', hue='target')
+sns.lineplot(data=df, x='timepoint', y='accuracy', hue='target', style='clf')
 #%% try frequency bands
 # a bit more sophisticated approach: transform into frequency bands
 # the most simple case here would be to transform into frequency space
 # and to bin the results according to common brain bands delta beta alpha etc
 
 import features
+import mne_features
+
 fig, axs, ax_b = plotting.make_fig(len(data), n_bottom=[0,0,1])
 
 df = pd.DataFrame()
@@ -205,6 +287,7 @@ for i, night in enumerate(tqdm(data, desc='subj')):
     times, bands = features.get_bands(data_x, tstep=0.25, n_pca=False, wlen=1, relative=False)
 
     df_subj = pd.DataFrame()
+
 
     for target, train_y in data_y.items():
         y = train_y.copy()
