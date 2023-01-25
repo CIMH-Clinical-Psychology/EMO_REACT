@@ -259,13 +259,13 @@ for i, which_test in enumerate(tqdm(data_test, desc='subj')):
         df_subj = pd.concat([df_subj, df_tmp], ignore_index=True)
 
     if len(df_subj)>0:
-        sns.lineplot(data=df_subj, x='timepoint', y='score' ,
-                     hue='target', ax=axs[i], errorbar='sd')
+        sns.barplot(data=df_subj, x='target', y='score' ,
+                     ax=axs[i], errorbar='sd')
         df = pd.concat([df, df_subj], ignore_index=True)
     plt.pause(0.1)
 
-# sns.lineplot(data=df[df['target']!='img_category'], x='timepoint', y='accuracy', hue='target')
-sns.lineplot(data=df, x='timepoint', y='accuracy', hue='target', style='clf')
+sns.barplot(data=df, x='target', y='score', ax=ax_b)
+ax_b.hlines([0.5, 0.25], *ax_b.get_xlim())
 #%% try frequency bands
 # a bit more sophisticated approach: transform into frequency bands
 # the most simple case here would be to transform into frequency space
