@@ -39,6 +39,9 @@ class image_categories(IntEnum):
     Animal = 2
     Person = 3
 
+split_arousal = 3.73  # above this value, arousal was defined as "high", below as "low"
+split_valence = 4.61  # above this value, high arousal images were defined as "positive", below "negative"
+
 rating_map = {49:0,   # Very Happy  |  Very Arousing
               50:1,
               51:2,
