@@ -42,7 +42,7 @@ def aggregate(df, by1='image arousal', by2='timepoint', metric='f1-score',
         res = test_func(vals1, vals2)
         pvals += [res.pvalue]*2
         tstats += [res.statistic]*2
-        
+
     df_aggr[f'{metric} p'] = pvals
     df_aggr[f'{metric} relative tstat'] = tstats
     return df_aggr
@@ -52,7 +52,7 @@ def aggregate(df, by1='image arousal', by2='timepoint', metric='f1-score',
 folders_subj = ospath.list_folders(f'{settings.data_dir}/Raw_data/', pattern='PN*')
 
 
-# data is a very nested dictionary 
+# data is a very nested dictionary
 # with levels data[subj][night_type][test_type]
 # subj = subject id, e.g. PN01
 # night_type = high or low arousal
@@ -65,7 +65,7 @@ for folder in tqdm(folders_subj, desc='loading participant responses'):
     if len(nights_folders)<2:
         print(f'{len(nights_folders)} night(s) for {subj}, skipping')
         continue
-    
+
     data[subj] = {}
     for folder_night in nights_folders:
         night_type = data_loading.get_learning_type(folder_night)
@@ -79,12 +79,12 @@ for folder in tqdm(folders_subj, desc='loading participant responses'):
             resp['subj_arousal']+=1
             data[subj][night_type][test_type] = resp
             data[subj][night_number][test_type]  = resp
-# store all variables loaded so far in here , this way we can remove all 
+# store all variables loaded so far in here , this way we can remove all
 # computed variables later without losing them or leaking into other analyis
 new_vars = set()
 
 
-#%% 1.1 memory performance high vs low 
+#%% 1.1 memory performance high vs low
 settings.clear(locals(), new_vars)  # clear all variables for good measures
 curr_locals = set(locals())
 
@@ -92,29 +92,29 @@ fig, axs, ax_b = plotting.make_fig(len(data), [0,1])
 
 df = pd.DataFrame()
 for i, subj in enumerate(data):
-    
+
     df_subj = pd.DataFrame()
     for ntype in ['high', 'low']:
         for ttype in ['BS', 'AS']:
             resp = data[subj][ntype][ttype]
-            perf = classification_report(resp['seen_before'].values, 
+            perf = classification_report(resp['seen_before'].values,
                                          resp['seen_before_resp'].values,
                                          output_dict=True)
             df_tmp = pd.DataFrame({'subject': subj,
                                    'image arousal': ntype,
                                    'timepoint': ttype,
-                                   } | perf['weighted avg'], 
+                                   } | perf['weighted avg'],
                                   index=[0])
             df_subj = pd.concat([df_subj, df_tmp], ignore_index=True)
-            
+
     ax = axs[i]
     ax.set_title(f'{subj} memory performance old/new')
     sns.barplot(data=df_subj,hue='timepoint', y='f1-score', x='image arousal', ax=ax)
     ax.set_ylim(0.8, 1.05)
     ax.legend(loc='upper center')
     df = pd.concat([df, df_subj])
-    
-    
+
+
 sns.boxplot(data=df, hue='timepoint', y='f1-score', x='image arousal', ax=ax_b,)
 # sns.violinplot(data=df, hue='timepoint', y='f1-score', x=' learning'
 #                , split=True, ax=ax_b)
@@ -127,7 +127,7 @@ for ntype in ['high', 'low']:
     val_after  = df[(df['image arousal']==ntype) & (df['timepoint']=='AS')]['f1-score']
     pvals[ntype] = ttest_rel(val_before, val_after)
     # print(ttest_rel(val_before, val_after))
-  
+
 name = './results/1.1 memory performance old-new'
 p = ', '.join([f'{key} before/after p={val.pvalue:.3f}'for key, val in pvals.items()])
 ax_b.set_title(f'memory performance old/new - n={len(data)}\n{p}')
@@ -135,7 +135,7 @@ plt.pause(0.1)
 fig.tight_layout()
 plt.pause(0.1)
 fig.tight_layout()
-fig.savefig(f'{name}.png')   
+fig.savefig(f'{name}.png')
 # save data to disk as well
 df = df.sort_values(['image arousal', 'subject'])
 df.to_excel(f'{name}_raw.xlsx')
@@ -155,7 +155,7 @@ fig, axs, ax_b = plotting.make_fig(len(data), [0,1])
 
 df = pd.DataFrame()
 for i, subj in enumerate(data):
-    
+
     df_subj = pd.DataFrame()
     for ntype in ['high', 'low']:
         for ttype in ['BS', 'AS']:
@@ -170,16 +170,16 @@ for i, subj in enumerate(data):
             df_tmp = pd.DataFrame({'subject': subj,
                                    'image arousal': ntype,
                                    'timepoint': ttype,
-                                   'accuracy': acc 
+                                   'accuracy': acc
                                    }, index=[0])
             df_subj = pd.concat([df_subj, df_tmp], ignore_index=True)
-            
+
     ax = axs[i]
     ax.set_title(f'{subj} memory performance quadrant')
     sns.barplot(data=df_subj,hue='timepoint', y='accuracy', x='image arousal', ax=ax)
     ax.set_ylim(0.6, 1.05)
     df = pd.concat([df, df_subj])
-    
+
 sns.boxplot(data=df, hue='timepoint', y='accuracy', x='image arousal', ax=ax_b)
 # sns.violinplot(data=df, hue='timepoint', y='f1-score', x='image arousal'
 #                , split=True, ax=ax_b)
@@ -191,7 +191,7 @@ for ntype in ['high', 'low']:
     val_before = df[(df['image arousal']==ntype) & (df['timepoint']=='BS')]['accuracy']
     val_after  = df[(df['image arousal']==ntype) & (df['timepoint']=='AS')]['accuracy']
     pvals[ntype] = ttest_rel(val_before, val_after)
-    
+
 name = './results/1.2 memory performance quadrant'
 p = ', '.join([f'{key} before/after p={val.pvalue:.3f}'for key, val in pvals.items()])
 ax_b.set_title(f'memory performance quadrant for both nights - n={len(data)}\n{p=}')
@@ -199,7 +199,7 @@ plt.pause(0.1)
 fig.tight_layout()
 plt.pause(0.1)
 fig.tight_layout()
-fig.savefig(f'{name}.png')     
+fig.savefig(f'{name}.png')
 
 # save data to disc
 df = df.sort_values(['image arousal', 'subject'])
@@ -259,7 +259,7 @@ fig.tight_layout()
 name = '1.3 Correlation subjective and OASIS ratings'
 fig.savefig(f'./results/{name}.png')
 df.to_excel(f'./results/{name}_raw.xlsx')
-df = pd.DataFrame({'p value': [p_valence, p_arousal], 
+df = pd.DataFrame({'p value': [p_valence, p_arousal],
               'Pearsons r': [r_valence, r_arousal],
               'subj mean': [df['subj_valence'][idx1].mean(), df['subj_arousal'][idx2].mean()],
               'subj std': [df['subj_valence'][idx1].std(), df['subj_arousal'][idx2].std()],
@@ -289,7 +289,7 @@ for i, subj in enumerate(data):
     df = pd.concat([df, df_subj], ignore_index=True)
 
     ax = axs[i]
-    sns.swarmplot(data=df_subj, y='subj_arousal', x='night', hue='night', dodge=True, 
+    sns.swarmplot(data=df_subj, y='subj_arousal', x='night', hue='night', dodge=True,
                   ax=ax, legend=False)
     ax.set_title(f'{subj}')
 filter_nan = lambda df: df[~df.isna()].values
@@ -298,7 +298,7 @@ tstat, pval = ttest_ind(*values_arousal)
 
 ax_a.set_ylabel('subjective arousal rating')
 ax_a.set_title(f'Arousal rating for diff. nights\nttest: {tstat=:.4f} {pval=:.4f}')
-sns.swarmplot(data=df_subj, y='subj_arousal', x='night', hue='night', dodge=True, 
+sns.swarmplot(data=df_subj, y='subj_arousal', x='night', hue='night', dodge=True,
               ax=ax_a, legend=True)
 plt.tight_layout()
 plt.pause(0.1)
@@ -330,7 +330,7 @@ for i, subj in enumerate(data):
     df = pd.concat([df, df_subj], ignore_index=True)
 
     ax = axs[i]
-    sns.swarmplot(data=df_subj, y='subj_valence', x='night', hue='night', dodge=True, 
+    sns.swarmplot(data=df_subj, y='subj_valence', x='night', hue='night', dodge=True,
                   ax=ax, legend=False)
     ax.set_title(f'{subj}')
 filter_nan = lambda df: df[~df.isna()].values
@@ -339,7 +339,7 @@ tstat, pval = ttest_ind(*values_arousal)
 
 ax_a.set_ylabel('subjective valence rating')
 ax_a.set_title(f'valence rating for diff. nights\nttest: {tstat=:.4f} {pval=:.4f}')
-sns.swarmplot(data=df_subj, y='subj_valence', x='night', hue='night', dodge=True, 
+sns.swarmplot(data=df_subj, y='subj_valence', x='night', hue='night', dodge=True,
               ax=ax_a, legend=True)
 plt.tight_layout()
 plt.pause(0.1)
@@ -353,6 +353,52 @@ df_aggr = aggregate(df, 'dummy', 'night', metric='subj_valence', test_func=ttest
 df_aggr.to_excel(f'./results/{name}_mean.xlsx')
 fig.savefig(f'./results/{name}.png')
 new_vars = set(locals()).difference(curr_locals)
+
+#%% 1.5b Valence ratings high arousal night only
+settings.clear(locals(), new_vars)  # clear all variables for good measures
+curr_locals = set(locals())
+
+fig, axs, ax_a = plotting.make_fig(7, [0,0,1])
+
+def bin_valence(val):
+    return 'low' if val < settings.split_valence else 'high'
+
+df = pd.DataFrame()
+for i, subj in enumerate(data):
+    ratings = []
+    for timepoint in data[subj]['high']:
+        df_tmp = data[subj][night][timepoint].copy()
+        df_tmp['valence_mean'] = df_tmp['valence_mean'].apply(bin_valence)
+        ratings.append(df_tmp)
+    df_subj = pd.concat(ratings, ignore_index=True).drop_duplicates()
+    df = pd.concat([df, df_subj], ignore_index=True)
+
+    ax = axs[i]
+    sns.swarmplot(data=df_subj, y='subj_valence', x='valence_mean', dodge=True,
+                  ax=ax, legend=False)
+    ax.set_title(f'{subj}')
+filter_nan = lambda df: df[~df.isna()].values
+values_arousal = [filter_nan(g['subj_valence']) for _,g in df.groupby('valence_mean')]
+tstat, pval = ttest_ind(*values_arousal)
+
+ax_a.set_ylabel('subjective valence rating')
+ax_a.set_title(f'valence rating for high arousal nights\nttest: {tstat=:.4f} {pval=:.4f}')
+ax_a.set_xlabel(f'valence category\n(by median split of OASIS)')
+sns.swarmplot(data=df_subj, y='subj_valence', x='valence_mean', dodge=True,
+              ax=ax_a, legend=True)
+plt.tight_layout()
+plt.pause(0.1)
+fig.tight_layout()
+plt.pause(0.1)
+fig.tight_layout()
+name = '1.5 valence rating for high arousal nights'
+df.to_excel(f'./results/{name}_raw.xlsx')
+df['dummy']=1
+df_aggr = aggregate(df, 'dummy', 'night', metric='subj_valence', test_func=ttest_ind)
+df_aggr.to_excel(f'./results/{name}_mean.xlsx')
+fig.savefig(f'./results/{name}.png')
+new_vars = set(locals()).difference(curr_locals)
+
 
 #%% 1.6 Category effect on ratings
 settings.clear(locals(), new_vars)  # clear all variables for good measures
@@ -376,7 +422,7 @@ for i, subj in enumerate(data):
                   hue='img_category', ax=ax, legend=False, size=4)
     ax.set_title(f'{subj}')
     ax.set_ylabel('rating')
-    
+
 filter_nan = lambda df: df[~df.isna()].values
 values_valence = [filter_nan(g['subj_valence']) for _,g in df.groupby('img_category')]
 values_arousal = [filter_nan(g['subj_arousal']) for _,g in df.groupby('img_category')]
@@ -397,7 +443,7 @@ sns.swarmplot(data=df, y='subj_arousal', x='img_category', dodge=True,
               hue='img_category', ax=ax_b, legend=True, size=4)
 
 name = '1.6 category effect'
-pd.DataFrame({'p value': [p_valence, p_arousal], 
+pd.DataFrame({'p value': [p_valence, p_arousal],
               '1-way ANOVA f value': [f_valence, f_arousal],
               'rating': ['valence', 'arousal']}).to_excel(f'./results/{name}_stats.xlsx')
 plt.pause(0.1)
