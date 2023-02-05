@@ -84,10 +84,15 @@ if username == 'simon' and host=='desktop-simon':
 elif username == 'simon.kern' and host=='zilxap29':
     data_dir = '/data/Emo_React/'
     cache_dir = f'{home}/joblib-cache/emo-react/'
-
+    
+elif username == 'ardiansyah.esmondo' and host=='zilxap29':
+    data_dir = '/hobbes/Klips/Esmondo/Emo_React/'
+    cache_dir = f'{home}/joblib-cache/emo-react/'
+    
 elif username == 'simon' and host=='simon-kubuntu':
     data_dir = '/data/Emo_React/'
     cache_dir = f'{home}/joblib-cache/emo-react/'
+    
 
 else:
     raise Exception(f'No profile found for {username} @ {host}')
