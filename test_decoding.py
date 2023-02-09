@@ -8,39 +8,50 @@ Dummy testing of decoders
 """
 import ospath
 import mne
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from tqdm import tqdm
+import features
+import mne_features
+
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVR, SVC
 from sklearn.metrics import mean_squared_error, make_scorer
+from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import cross_val_score
-import numpy as np
-import matplotlib.pyplot as plt
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import f1_score
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.decomposition import PCA
+
+
 from mne.decoding import (SlidingEstimator, GeneralizingEstimator, Scaler,
                           cross_val_multiscore, LinearModel, get_coef,
                           Vectorizer, CSP)
-from scipy.stats import zscore
-
-from settings import trigger
-import seaborn as sns
-
-from sklearn.model_selection import StratifiedKFold
-from sklearn.pipeline import make_pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.preprocessing import MinMaxScaler
-
 from mne import io, pick_types, read_events, Epochs, EvokedArray, create_info
 from mne.datasets import sample
 from mne.preprocessing import Xdawn
-from mne.decoding import Vectorizer
-from sklearn.metrics import f1_score
-import pandas as pd
+# from mne.decoding import Vectorizer
+
+from mne_features.feature_extraction import extract_features
+
+from scipy.stats import zscore
 from scipy.ndimage import gaussian_filter
 
+from settings import trigger
 import settings
 import plotting
+
 from data_loading import get_night, get_learning_type, get_subj
 from data_loading import load_localizer, load_test
 import yasa
@@ -64,14 +75,19 @@ data = {}   # this variable will hold all data of the localizer
 data_test = {}  # dictionary to hold the data of testing
 
 for folder in tqdm(folders_subj, desc='loading participant localizers'):
+    
     # in each folder there are two separate recording days/nights
     nights_folders = ospath.list_folders(folder, pattern='*night*')
+    
     # retrieve name of subject, i.e. "PN05"
     subj = get_subj(folder)
+    
     # for each subject, load the two experiment days
     for folder_night in nights_folders:
+        
         # retrieve which learning type we have: low or high arousal images
         night = get_learning_type(folder_night)
+        
         # load the data of the localizer of that specific day
         times, data_x, data_y  = load_localizer(folder_night, sfreq=sfreq,
                              tmin=tmin, tmax=tmax, event_id=trigger.STIMULUS)
@@ -91,13 +107,147 @@ for folder in tqdm(folders_subj, desc='loading participant localizers'):
         # save data in the data dictionary, for later access
         data[f'{subj}-{night}'] = times, data_x, data_y
 
+
         for which in ['before', 'after']: # also load the data of the test session
+        
             times, data_x, data_y  = load_test(folder_night, which=which, sfreq=sfreq,
                                                tmin=tmin, tmax=tmax, event_id=trigger.STIMULUS)
 
             data_test[f'{subj}-{night}-{which}'] = times, data_x, data_y
+            
+        
     # except:
         # print(f'ERROR: {folder}')
+
+#%% Mondo: Input Data Preparation
+
+# List of data names from all session
+data_name = list(data_test.keys())
+
+# Take example data from subj 1 (PN01-high-before)
+X_times, X_PN01_hb, y = data_test[data_name[18]]
+
+# Label dataset in dataframe format
+y_df = pd.DataFrame(y)
+
+# Some ways to get the column name (label name)
+# y_col_df = sorted(y_df) #returns the label name alphabetically
+# y_col_df = y_df.columns.values.tolist()
+# y_col = list(y.keys()) #returns the label name directly from dict
+
+# Separating new/old image class
+# y_img_truth = data_label['seen_before_truth']
+# y_img_resp = data_label['seen_before_response']
+y_img_truth = y_df.seen_before_truth.replace({True: 1, False: 0})
+y_img_resp = y_df.seen_before_response.replace({True: 1, False: 0})
+
+# Need to balance classes
+
+#%% Assemble Classifier
+
+# Feature Extraction
+features_example = {'mean', 'ptp_amp', 'std'} # func_params
+X_PN01_hb = extract_features(X_PN01_hb, sfreq, features_example) #returns (n_epochs, n_features)
+
+logreg = LogisticRegression(penalty='l1', C=1/1, solver='liblinear')
+# lda = LinearDiscriminantAnalysis()
+# csp = CSP(n_components=4, reg=None, log=True, norm_trace=False)
+
+# # Dimensionality Reduction (PCA)
+# pca = PCA(n_components=0.95)
+# X_PN01_hb = pca.fit_transform(X_PN01_hb)
+
+# Make Pipeline
+pipe_1 = Pipeline([('scaler', StandardScaler()), ('lr', logreg)])
+# pipe_2 = Pipeline([('CSP', csp), ('LDA', lda)])
+# pipe_3 = Pipeline([('pca', pca),('classifier', SVC)])
+# pipe_4 = Pipeline([('pca', pca),('clf', LogisticRegression())])
+# pipe_5 = Pipeline([('scaler', StandardScaler()),
+#                    ('pca', pca,
+#                     ('classifier', logreg)
+#                     )])
+# pipe = make_pipeline(StandardScaler(), logreg)
+# pipe = make_pipeline(csp,lda)
+
+# Initialize StratifiedKFold
+n_folds = 5
+skf = StratifiedKFold(n_splits=n_folds,
+                      shuffle=True,
+                      random_state=0)
+
+# Score temp for results
+accuracy_resp = np.zeros(n_folds)
+accuracy_truth = np.zeros(n_folds)
+
+#%% Mondo: Cross-Validation
+
+for i, (train_idx, test_idx) in enumerate(skf.split(X_PN01_hb, y_img_resp)):
+    X_train, X_test = X_PN01_hb[train_idx], X_PN01_hb[test_idx]
+    y_resp_train, y_resp_test = y_img_resp[train_idx], y_img_resp[test_idx]
+    y_truth_train, y_truth_test = y_img_truth[train_idx], y_img_truth[test_idx]
+   
+    # Fit pipeline on training data
+    pipe_1.fit(X_train, y_resp_train)
+   
+    # Predict response on test data
+    y_resp_pred = pipe_1.predict(X_test)
+    accuracy_resp[i] = accuracy_score(y_resp_test, y_resp_pred)
+   
+    # Predict truth on test data
+    y_truth_pred = pipe_1.predict(X_test)
+    accuracy_truth[i] = accuracy_score(y_truth_test, y_truth_pred)
+
+# Print mean accuracy for response and truth labels
+print(".\n.\n.\n")
+print("Mean accuracy for response:", np.mean(accuracy_resp))
+print("Mean accuracy for truth:", np.mean(accuracy_truth))
+
+
+stop
+
+
+#%%
+# # Split data 80:20
+# # feature vector 'X_PN01_hb' is used as the input
+# X_train, X_test, y_train_resp, y_test_resp = train_test_split(X_PN01_hb, y_img_resp, test_size=0.2, random_state=0)
+
+
+# Perform PCA on the training data
+
+# X_train = pca.fit_transform(X_train)
+
+# Apply the same transformation to the test data
+# X_test = pca.transform(X_test)
+                    
+
+# # Grid Search param to find best hyperparameters for logistic regression
+# param_grid = {'clf__C': [0.1, 1, 10, 100],
+#               'clf__penalty': ['l1','l2']}
+
+# # perform grid-search with cross-validation
+# grid_search = GridSearchCV(pipe_4, param_grid, cv=5)
+# grid_search.fit(X_train, y_train)
+
+# # Fit pipeline to the X_train
+# pipe.fit(X_train, y_train_resp)
+
+# # cross-validation
+# cv = StratifiedKFold(n_splits=5, random_state=42)
+
+
+# # evaluate
+# # scores = cross_val_score(grid_search.best_estimator_, X_test, y_test, cv=5)
+# scores = cross_val_score(X_train, y_train_resp, cv=cv)
+# print("cross-validation accuracy: %.2f +/- %.2f" % (scores.mean(), scores.std()))
+
+# # make prediction on the X_test
+# y_pred = pipe.predict(X_test)
+
+# print(classification_report(y_test_resp. y_pred))
+
+# print("accuracy between predicted labels and true labels: %0.2f" % np.mean(y_pred == ))
+
+
 
 
 
