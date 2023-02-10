@@ -24,7 +24,7 @@ The experiment has the following setup
 
 1. same procedure as in Experiment part 2, but instead of neutral images, the participant learns emotionally highly arousing images, if they have learned low arousing images in part 2 and vice versa.
 
-**Diagram of Image Partition in the  Experiment
+**Diagram of Image Partition in the  Experiment**
 ![emo_react_pics-Page-2 drawio](https://user-images.githubusercontent.com/15683682/218058901-c53c8475-27a6-42f9-86a0-2519a07eed21.png)
 
 
