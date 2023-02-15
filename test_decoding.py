@@ -124,8 +124,8 @@ for folder in tqdm(folders_subj, desc='loading participant localizers'):
 # List of data names from all session
 data_name = list(data_test.keys())
 
-# Take example data from subj 1 (PN01-high-before)
-X_times, X_PN01_hb, y = data_test[data_name[18]]
+# Take example data from subj 1 (PN09-high-before)
+X_times, X_PN01_hb, y = data_test[data_name[22]]
 
 # Label dataset in dataframe format
 y_df = pd.DataFrame(y)
@@ -141,13 +141,32 @@ y_df = pd.DataFrame(y)
 y_img_truth = y_df.seen_before_truth.replace({True: 1, False: 0})
 y_img_resp = y_df.seen_before_response.replace({True: 1, False: 0})
 
-# Need to balance classes
+count_0_truth = np.count_nonzero(y_img_truth==0)
+count_1_truth = np.count_nonzero(y_img_truth==1)
+count_0_resp = np.count_nonzero(y_img_resp==0)
+count_1_resp = np.count_nonzero(y_img_resp==1)
+
 
 #%% Assemble Classifier
 
 # Feature Extraction
 features_example = {'mean', 'ptp_amp', 'std'} # func_params
 X_PN01_hb = extract_features(X_PN01_hb, sfreq, features_example) #returns (n_epochs, n_features)
+
+# Need to balance classes (Undersampling)
+
+from imblearn.under_sampling import RandomUnderSampler
+rus = RandomUnderSampler(sampling_strategy='majority')
+X, y_resp_rus = rus.fit_resample(X_PN01_hb, y_img_resp)
+y_truth_rus = y_img_truth[y_resp_rus]
+
+count_0 = np.count_nonzero(y_resp_rus==0)
+count_1 = np.count_nonzero(y_resp_rus==1)
+print(f"Number of 0s before undersammpling: {count_0_resp}\nNumber of 0s after undersammpling: {count_0}")
+print(f"Number of 1s before undersammpling: {count_1_resp}\nNumber of 1s after undersammpling: {count_1}")
+
+
+#%% Assemble Classifier
 
 logreg = LogisticRegression(penalty='l1', C=1/1, solver='liblinear')
 # lda = LinearDiscriminantAnalysis()
@@ -181,9 +200,10 @@ accuracy_truth = np.zeros(n_folds)
 
 #%% Mondo: Cross-Validation
 
-for i, (train_idx, test_idx) in enumerate(skf.split(X_PN01_hb, y_img_resp)):
-    X_train, X_test = X_PN01_hb[train_idx], X_PN01_hb[test_idx]
-    y_resp_train, y_resp_test = y_img_resp[train_idx], y_img_resp[test_idx]
+for i, (train_idx, test_idx) in enumerate(skf.split(X, y_resp_rus)):
+    
+    X_train, X_test = X[train_idx], X[test_idx]
+    y_resp_train, y_resp_test = y_resp_rus[train_idx], y_resp_rus[test_idx]
     y_truth_train, y_truth_test = y_img_truth[train_idx], y_img_truth[test_idx]
    
     # Fit pipeline on training data
