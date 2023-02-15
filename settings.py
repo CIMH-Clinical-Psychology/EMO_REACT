@@ -61,7 +61,13 @@ quad_map = {97: 4,    # lower left
 stage_map = {1: 'S1', 2:'S2', 3:'SWS', 4:'REM', 0:'Wake'}
 
 ref_ch = 'FCz'  # reference channel used in the sleep lab
-
+ch_names = ['Fp1', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'FC5', 'FC1', 'FC2',
+            'FC6', 'T7', 'C3', 'C4', 'T8', 'TP9', 'CP5', 'CP1', 'CP2', 'CP6',
+            'TP10', 'P7', 'P3', 'Pz', 'P4', 'P8', 'PO9', 'O1', 'Oz', 'O2',
+            'PO10', 'AF7', 'AF3', 'AF4', 'AF8', 'F5', 'F1', 'F2', 'F6', 'FT9',
+            'FT7', 'FC3', 'FC4', 'FT8', 'FT10', 'C5', 'C1', 'C2', 'C6', 'TP7',
+            'CP3', 'CPz', 'CP4', 'TP8', 'P5', 'P1', 'P2', 'P6', 'PO7', 'PO3',
+            'POz', 'PO4', 'PO8', 'ECG', 'HEOG', 'VEOG', 'EMG', 'FCz']
 
 use_caching = False
 
@@ -87,15 +93,15 @@ if username == 'simon' and host=='desktop-simon':
 elif username == 'simon.kern' and host=='zilxap29':
     data_dir = '/data/Emo_React/'
     cache_dir = f'{home}/joblib-cache/emo-react/'
-    
+
 elif username == 'ardiansyah.esmondo' and host=='zilxap29':
     data_dir = '/hobbes/Klips/Esmondo/Emo_React/'
     cache_dir = f'{home}/joblib-cache/emo-react/'
-    
+
 elif username == 'simon' and host=='simon-kubuntu':
     data_dir = '/data/Emo_React/'
     cache_dir = f'{home}/joblib-cache/emo-react/'
-    
+
 
 else:
     raise Exception(f'No profile found for {username} @ {host}')
