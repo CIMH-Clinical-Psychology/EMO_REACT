@@ -20,20 +20,14 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVR, SVC
 from sklearn.metrics import (mean_squared_error, make_scorer,
-                             accuracy_score, recall_score, f1_score,
+                             accuracy_score, recall_score, precision_score,
+                             f1_score,roc_curve, auc,
                              classification_report, confusion_matrix)
-# from sklearn.metrics import classification_report
-# from sklearn.metrics import accuracy_score
 from sklearn.pipeline import make_pipeline, Pipeline
-# from sklearn.pipeline import Pipeline
 from sklearn.model_selection import (GridSearchCV, cross_val_score, 
-                                     StratifiedKFold, train_test_split)
-# from sklearn.model_selection import StratifiedKFold
-# from sklearn.model_selection import train_test_split
-# from sklearn.metrics import classification_report, confusion_matrix
+                                     StratifiedKFold, train_test_split,
+                                     cross_val_predict)
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-# from sklearn.preprocessing import StandardScaler
-# from sklearn.metrics import f1_score
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import SelectKBest, f_classif
@@ -44,9 +38,7 @@ from mne.decoding import (SlidingEstimator, GeneralizingEstimator, Scaler,
                           Vectorizer, CSP)
 from mne import io, pick_types, read_events, Epochs, EvokedArray, create_info
 from mne.datasets import sample
-# from mne.preprocessing import Xdawn
-# from mne.time_frequency import psd_multitaper
-# from mne.time_frequency import cwt_morlet
+
 
 
 from mne_features.feature_extraction import extract_features
@@ -125,7 +117,7 @@ for folder in tqdm(folders_subj, desc='loading participant localizers'):
     # except:
         # print(f'ERROR: {folder}')
 
-stop
+# stop
 
 #%% Data Storage (Predictor and Labels)
 
@@ -142,7 +134,8 @@ y_df = pd.DataFrame(y)
 # Separating new/old image class
 y_truth = y_df.seen_before_truth.replace({True: 1, False: 0})
 y_resp = y_df.seen_before_response.replace({True: 1, False: 0})
-
+y_truth = y_truth.values
+y_resp = y_resp.values
 
 # indices of 0 and 1 from y_resp
 class_idx_0 = np.where(y_resp == 0)[0]
@@ -179,117 +172,153 @@ y_truth = y_truth[combined_idx]
 
 
 #%% Feature Extraction
-features_example = {'mean', 'ptp_amp', 'std', 'var, ''mdian'} # func_params
-def extrat_timewindows():
-    wins = []
-    for w in windows:
-        X = extract_features(X, sfreq, features_example) #returns (n_epochs, n_features)
-        wins.append(X_feats
-    return []
-#%% Assemble Classifier Pipeline
+selected_features = {'mean', 'ptp_amp', 'std'}
 
-
-# PCA (Dimensionality Reduction)
-pca = PCA(n_components=0.95)
-
-# ANOVA (to select channels that contain significant stimulus-specific information)
-# Selecting features according to the k highest score
-anova = SelectKBest(f_classif, k=5)
-# anova = f_classif
-
-# Classifier
-logreg = LogisticRegression(penalty='l1', C=1/1, solver='liblinear')
-clf = RandomForestClassifier(100)
-
-# Scaling method
-scaler = StandardScaler()
-
-# Pipelines
-pipelines = {
-    'None': make_pipeline(scaler, logreg),
-    'PCA': make_pipeline(scaler, pca, logreg),
-    'ANOVA': make_pipeline(scaler, anova, logreg)
-    }
-
-# pipelines1 = [('pca', pca),('anova',anova),('none',None)]
-from pysnooper import snoop
-
-@snoop()
-def extract(X):
-    for w in range(0,301, 50):
-        X_win = X[w:w+50]
-extract(X)
-
-# Sliding estimator
-time_decoding = SlidingEstimator(make_pipeline(scaler, pca, logreg), n_jobs=1, scoring='accuracy', verbose=True)
-
-
-
-
-
-#%% Cross-Validation
-
-# Initialize StratifiedKFold
-n_folds = 5
-skf = StratifiedKFold(n_splits=n_folds,
-                      shuffle=True,
-                      random_state=0)
-
-# Score temp for results
-# accuracy_resp = np.zeros(n_folds)
-# accuracy_truth = np.zeros(n_folds)
-scores = []
-
-for i, (train_idx, test_idx) in enumerate(skf.split(X, y_resp)):
+def extract_time_windows(X, sfreq, window_size, step_size):
     
-    # X_train, y_train = X[train_idx], y_resp[train_idx]
-    # X_test, y_test = X[test_idx], y_resp[test_idx]
+    # n_epochs, n_channels, n_samples = X.shape
+    n_samples = X.shape[-1]
+    
+    # Define the sliding time windows
+    window_samples = int(window_size * sfreq)
+    step_samples = int(step_size * sfreq) - 1
        
-    X_train, X_test = X[train_idx], X[test_idx]
-    y_train, y_test = y_resp[train_idx], y_resp[test_idx]
-    y_truth_train, y_truth_test = y_truth[train_idx], y_truth[test_idx]
-   
-    # Fit pipeline on training data
-    time_decoding.fit(X_train, y_train)
-   
-    # Predict response on test data
-    y_pred = time_decoding.predict(X_test)
-    # accuracy_resp[i] = accuracy_score(y_resp_test, y_resp_pred)
-   
-    # Predict truth on test data
-    y_true = y_resp[test_idx]
-    # accuracy_truth[i] = accuracy_score(y_truth_test, y_truth_pred)
+    windows = []
+    n_windows = 0
     
-    accuracy = np.mean(y_pred == y_true)
-    recall = np.sum((y_pred == 1) & (y_true == 1)) / np.sum(y_true == 1)
-    sensitivity = np.sum((y_pred == 0) & (y_true == 0)) / np.sum(y_true == 0)
-    
-    print(f'Accuracy: {accuracy:.2f}')
-    print(f'Recall: {recall:.2f}')
-    print(f'Sensitivity: {sensitivity:.2f}')
-    
-    # Confusion matrix
-    conf_matrix = confusion_matrix(y_true, y_pred)
-    print(conf_matrix)
-    
-    # Decoding score
-    score = cross_val_multiscore(time_decoding, X, y_resp, cv=skf, n_jobs=1)
-    scores.append(score)
+    for i in range(0, n_samples - window_samples + 1, step_samples):
+                
+        if i == step_samples:
+            start = i + 1
+        else:
+            start = i   
+        end = start + window_samples - 1
+        print("Extracting time window within {} and {} sample points".format(start, end))
+        
+       
+        if len(list(range(start,end+1)))==window_samples:
+            win_len = window*1000
+            print(f"Time window length is {win_len} ms")
+        else:
+            raise ValueError("start and end sample points might not equal to desired window size")
+        
+        X_window = X[:, :, start:end]
+        X_features = extract_features(X_window, sfreq, selected_features)       
+        windows.append(X_features)
+        n_windows += 1
+        print(f"Extracting time window {n_windows}")
 
-# # Print mean accuracy for response and truth labels
-# print(".\n.\n.\n")
-# print("Mean accuracy for response:", np.mean(accuracy_resp))
-# print("Mean accuracy for truth:", np.mean(accuracy_truth))
+    return np.array(windows)
 
-# plot
-fig, ax = plt.subplot()
-ax.plot(times, np.mean(scores, axis=0))
-ax.axhline(.5, color='k', linestyle='--', label='Chance')
-ax.set_xlabel('Time (s)')
-ax.set_ylabel('AUC')
-plt.legend()
-plt.show()
+# Define the time window size and step size in seconds
+window = 50/1000  # 50 ms
+step = (50/1000)
+"""
+if the step is equal to the windos size, there will be no overlap between
+consecutive windows.
+if the step is smaller than window size, we could extract features at higher
+temporal resolution (more computational work).
+"""
+
+# extract time windows
+X_timewindows = extract_time_windows(X, sfreq, window, step)
+"""
+This returns the segmented X time windows (n_windows, n_epochs, n_features).
+"""
+
+
+#%% New decoding
+
+# Classifier and cross-validation
+scaler = StandardScaler()
+clf = LogisticRegression()
+# pca = PCA(n_components=0.95)
+# anova = SelectKBest(f_classif, k=5)
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+# Get the total number of windows
+n_timewindows = X_timewindows.shape[0]
+
+# Set up the results storage
+results = {
+    'accuracy': np.zeros(n_timewindows),
+    'recall': np.zeros(n_timewindows),
+    'precision': np.zeros(n_timewindows),
+    'confmat': np.zeros((n_timewindows, 2, 2))
+}
+
+
+
+for i, X_window in enumerate(X_timewindows):
+    print(f"Processing time window {i+1} of {n_timewindows}")
+    
+    # Split the data into training and testing indices
+    n_trials = X_window.shape[0]
+    split_idx = np.random.permutation(n_trials)
+    split_point = int(n_trials * 0.8)
+    train_indices, test_indices = split_idx[:split_point], split_idx[split_point:]
+    
+    # Get the training data
+    X_train = X_window[train_indices]
+    y_train = y_resp[train_indices]
+    
+    # Get the testing data
+    X_test = X_window[test_indices]
+    y_test = y_resp[test_indices]
+    
+    # Get the true label for calculating performance metrics
+    y_train_true = y_truth[train_indices]
+    y_test_true = y_truth[test_indices]
+       
+    # Scale the data
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+    
+    
+    
+    # Perform classification using stratified cv
+    y_pred = cross_val_predict(clf, X_train, y_train, cv=cv)
+        
+        
+    
+    # Evaluate performance
+    accuracy = accuracy_score(y_train_true, y_pred)
+    recall = recall_score(y_train_true, y_pred)
+    precision = precision_score(y_train_true, y_pred)
+    # cm = sklearn.metrics.confusion_matrix(y_train_true, y_pred)
+    
+    tp = np.sum((y_pred == 1) & (y_train_true == 1))
+    tn = np.sum((y_pred == 0) & (y_train_true == 0))
+    fp = np.sum((y_pred == 1) & (y_train_true == 0))
+    fn = np.sum((y_pred == 0) & (y_train_true == 1))
+    
+    cm = np.array([[tn, fp], [fn, tp]])
+    
+    # Store the results
+    results['accuracy'][i] = accuracy
+    results['recall'][i] = recall
+    results['precision'][i] = precision
+    results['confmat'][i] = cm
 
 stop
+
+# Create a time axis in seconds
+time_axis = np.arange(n_timewindows) * window + window / 2
+
+# Plot the results
+plt.plot(time_axis, results['accuracy'], label='Accuracy')
+plt.plot(time_axis, results['recall'], label='Recall')
+plt.plot(time_axis, results['precision'], label='Precision')
+
+# Add labels and legend
+plt.xlabel('Time (s)')
+plt.ylabel('Score')
+plt.legend()
+
+# Show the plot
+plt.show()
+
+
+
 
 
