@@ -69,6 +69,33 @@ ch_names = ['Fp1', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'FC5', 'FC1', 'FC2',
             'CP3', 'CPz', 'CP4', 'TP8', 'P5', 'P1', 'P2', 'P6', 'PO7', 'PO3',
             'POz', 'PO4', 'PO8', 'ECG', 'HEOG', 'VEOG', 'EMG', 'FCz']
 
+# Define the brain regions and their corresponding channels
+occipital = ['O1', 'Oz', 'O2', 'PO9', 'PO10', 'PO7', 'PO3', 'PO4', 'PO8']
+parietal = ['P7', 'P3', 'Pz', 'P4', 'P8']
+frontal = ['Fp1', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'AF7', 'AF3', 'AF4', 'AF8', 'F5', 'F1', 'F2', 'F6']
+temporal = ['T7', 'C3', 'C4', 'T8', 'TP9', 'CP5', 'CP1', 'CP2', 'CP6', 'TP10']
+central = ['FC5', 'FC1', 'FC2', 'FC6', 'FT9', 'FT7', 'FC3', 'FC4', 'FT8', 'FT10', 'C5', 'C1', 'C2', 'C6', 'TP7', 'CP3', 'CPz', 'CP4', 'TP8', 'P5', 'P1', 'P2', 'P6']
+eye = ['HEOG', 'VEOG']
+
+# Define a dictionary to map each channel to its corresponding brain region
+channel_to_region = {}
+for channel in ch_names:
+    if channel in occipital:
+        channel_to_region[channel] = 'Occipital'
+    elif channel in parietal:
+        channel_to_region[channel] = 'Parietal'
+    elif channel in frontal:
+        channel_to_region[channel] = 'Frontal'
+    elif channel in temporal:
+        channel_to_region[channel] = 'Temporal'
+    elif channel in central:
+        channel_to_region[channel] = 'Central'
+    elif channel in eye:
+        channel_to_region[channel] = 'Eye'
+    else:
+        channel_to_region[channel] = 'Other'
+
+
 use_caching = False
 
 

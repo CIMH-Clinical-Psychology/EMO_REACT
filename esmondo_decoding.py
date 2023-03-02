@@ -15,6 +15,7 @@ import seaborn as sns
 from tqdm import tqdm
 import features
 import mne_features
+import time
 
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -145,10 +146,6 @@ class_idx_1 = np.where(y_resp == 1)[0]
 n_class_0_resp = len(class_idx_0)
 n_class_1_resp = len(class_idx_1)
 
-# n_class_0_truth = np.sum(y_truth == 0)
-# n_class_1_truth = np.sum(y_truth == 1)
-# n_class_0_resp = np.sum(y_resp == 0)
-# n_class_1_resp = np.sum(y_resp == 1)
 
 # Find class with minimum samples in y_resp
 min_class = 0 if n_class_0_resp < n_class_1_resp else 1
@@ -169,65 +166,158 @@ X = X[combined_idx,:,:]
 y_resp = y_resp[combined_idx]
 y_truth = y_truth[combined_idx]
 
+# stop
 
 
-#%% Feature Extraction
-selected_features = {'mean', 'ptp_amp', 'std'}
+#%% Extract Window Function
 
-def extract_time_windows(X, sfreq, window_size, step_size):
+# Function 1
+def extract_time_windows1(X, window_size, step_size):
+# def extract_time_windows1(X, sfreq, window_size, step_size):
     
     # n_epochs, n_channels, n_samples = X.shape
     n_samples = X.shape[-1]
     
     # Define the sliding time windows
-    window_samples = int(window_size * sfreq)
-    step_samples = int(step_size * sfreq) - 1
+    # window_samples = int(window_size * sfreq)
+    # step_samples = int(step_size * sfreq) - 1
        
     windows = []
     n_windows = 0
     
-    for i in range(0, n_samples - window_samples + 1, step_samples):
+    for i in range(0, n_samples - window_size + 1, step_size):
                 
-        if i == step_samples:
+        if i == step_size:
             start = i + 1
         else:
             start = i   
-        end = start + window_samples - 1
+        end = start + window_size - 1
         print("Extracting time window within {} and {} sample points".format(start, end))
         
        
-        if len(list(range(start,end+1)))==window_samples:
-            win_len = window*1000
-            print(f"Time window length is {win_len} ms")
+        if len(list(range(start,end+1)))==window_size:
+            
+            print(f"Time window length is {window_size} ms")
         else:
             raise ValueError("start and end sample points might not equal to desired window size")
         
         X_window = X[:, :, start:end]
-        X_features = extract_features(X_window, sfreq, selected_features)       
-        windows.append(X_features)
+        # selected_features = {'mean', 'ptp_amp', 'std'}
+        # X_features = extract_features(X_window, sfreq, selected_features)       
+        # windows.append(X_features)
+        windows.append(X_window)
         n_windows += 1
         print(f"Extracting time window {n_windows}")
 
     return np.array(windows)
 
+# Function 2
+from sklearn.feature_extraction.image import _extract_patches
+def extract_time_windows2(arr, wlen, step, axis=-1):
+    """
+        Parameters
+    ----------
+    arr : np.ndarray
+        input array of arbitrary dimensionality
+    wlen : int
+        window length in sample points
+    step : int
+        steps in sample points between window starts
+    axis : in, optional
+        Along which axis to extract, e.g -1 if the time dimension is the last
+        dimension.The default is -1.
+
+    Returns
+    -------
+    windows : np.ndarray
+        extracted windows. first dimension is the number of windows
+    """
+    patch_shape = list(arr.shape)
+    patch_shape[axis] = wlen
+    windows = _extract_patches(arr, patch_shape, extraction_step=step)
+    windows = windows.squeeze()
+    # arrays are views, so no changing of values allowed for safety
+    windows.setflags(write=False) 
+    
+    return windows
+
+
+# Function 3
+def extract_time_windows3(eeg_data, window_size, step_size):
+    num_trials, num_electrodes, num_samples = eeg_data.shape
+    
+    # Calculate the number of windows that will fit in the EEG data
+    num_windows = int(np.floor((num_samples - window_size) / step_size) + 1)
+    
+    # Create an empty array to store the extracted windows
+    extracted_windows = np.zeros((num_trials, num_electrodes, num_windows, window_size))
+    
+    # Loop through each trial and electrode
+    for trial in range(num_trials):
+        for electrode in range(num_electrodes):
+            # Extract windows for the current trial and electrode
+            for i in range(num_windows):
+                start_idx = i * step_size
+                end_idx = start_idx + window_size
+                extracted_windows[trial, electrode, i, :] = eeg_data[trial, electrode, start_idx:end_idx]
+    
+    return extracted_windows.swapaxes(0, 2).swapaxes(1,2)
+
+#%% Example
+array = np.random.rand(96, 64, 301)
+wlen = 10
+step = 1
+
+start_time = time.time()
+w1 = extract_time_windows2(array, wlen, step)
+end_time = time.time()
+elapsed_time = end_time - start_time
+print(f"Elapsed time of w1: {elapsed_time:.2f} seconds")
+
+start_time = time.time()
+w2 = extract_time_windows3(array, wlen, step)
+end_time = time.time()
+elapsed_time = end_time - start_time
+print(f"Elapsed time of w2: {elapsed_time:.2f} seconds")
+
+np.testing.assert_array_equal(w1, w2)
+
+#%% Time Windows Extraction
+
 # Define the time window size and step size in seconds
-window = 50/1000  # 50 ms
-step = (50/1000)
-"""
-if the step is equal to the windos size, there will be no overlap between
-consecutive windows.
-if the step is smaller than window size, we could extract features at higher
-temporal resolution (more computational work).
-"""
+# if the step is equal to the windos size, there will be no overlap between
+# consecutive windows.
+# if the step is smaller than window size, we could extract features at higher
+# temporal resolution (more computational work).
+# window_size = 100/1000  # 100 ms
+# step_size = (11/1000)
 
-# extract time windows
-X_timewindows = extract_time_windows(X, sfreq, window, step)
-"""
-This returns the segmented X time windows (n_windows, n_epochs, n_features).
-"""
+window_length = int(sfreq * 0.1)
+step = 1
 
+# # extract time windows 1 (n_windows, n_epochs, n_channels, n_samples)
+# start_time = time.time()
+# X_timewindows = extract_time_windows1(X, window_length, step)
+# end_time = time.time()
+# elapsed_time = end_time - start_time
+# print(f"Elapsed time of X_timewindows1: {elapsed_time:.2f} seconds")
 
-#%% New decoding
+# extract time windows 2 (n_windows, n_epochs, n_channels, n_samples)
+start_time = time.time()
+X_timewindows = extract_time_windows2(X, window_length, step)
+end_time = time.time()
+elapsed_time = end_time - start_time
+print(f"Elapsed time of X_timewindows2: {elapsed_time:.2f} seconds")
+
+# # extract time windows 3 (n_windows, n_epochs, n_channels, n_samples)
+# start_time = time.time()
+# X_timewindows = extract_time_windows3(X, window_length, step)
+# end_time = time.time()
+# elapsed_time = end_time - start_time
+# print(f"Elapsed time of X_timewindows3: {elapsed_time:.2f} seconds")
+
+#%% Assemble Features and Classifiers
+
 
 # Classifier and cross-validation
 scaler = StandardScaler()
@@ -236,21 +326,41 @@ clf = LogisticRegression()
 # anova = SelectKBest(f_classif, k=5)
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-# Get the total number of windows
-n_timewindows = X_timewindows.shape[0]
+# Get the total number of windows etc.
+n_timewindows, n_epochs, n_channels, n_samples = X_timewindows.shape
+# n_timewindows1 = X_timewindows1.shape[0]
 
 # Set up the results storage
+# results = []
 results = {
     'accuracy': np.zeros(n_timewindows),
     'recall': np.zeros(n_timewindows),
     'precision': np.zeros(n_timewindows),
-    'confmat': np.zeros((n_timewindows, 2, 2))
+    'f1': np.zeros(n_timewindows),
+    'confmat': np.zeros((n_timewindows, 2, 2)),
 }
 
+freq_bands = {'delta': (0.5, 4),
+              'theta': (4, 8),
+              'alpha': (8, 13),
+              'beta': (13, 30),
+              'gamma': (30, 50)}
+
+# selected_features = {'mean', 'ptp_amp', 'std'}
+selected_features = {'app_entropy'}
+# selected_features = list(freq_bands.keys())
 
 
+
+stop
+
+#%% Decoding Time Windows
+    
 for i, X_window in enumerate(X_timewindows):
     print(f"Processing time window {i+1} of {n_timewindows}")
+    
+    # each iteration represents each time window
+    # in each iteration, the shape of X_window is (n_epochs, n_channels, n_samples)
     
     # Split the data into training and testing indices
     n_trials = X_window.shape[0]
@@ -259,66 +369,88 @@ for i, X_window in enumerate(X_timewindows):
     train_indices, test_indices = split_idx[:split_point], split_idx[split_point:]
     
     # Get the training data
-    X_train = X_window[train_indices]
+    X_train = X_window[train_indices,:,:]
     y_train = y_resp[train_indices]
     
     # Get the testing data
-    X_test = X_window[test_indices]
+    X_test = X_window[test_indices,:,:]
     y_test = y_resp[test_indices]
     
     # Get the true label for calculating performance metrics
     y_train_true = y_truth[train_indices]
     y_test_true = y_truth[test_indices]
-       
-    # Scale the data
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
     
+    # Scale the training data
+    X_train_scaled = scaler.fit_transform(X_train.reshape(-1, n_channels*n_samples))
+    X_train_scaled = X_train_scaled.reshape(-1, n_channels, n_samples)
+
+    # Scale the testing data
+    X_test_scaled = scaler.transform(X_test.reshape(-1, n_channels*n_samples))
+    X_test_scaled = X_test_scaled.reshape(-1, n_channels, n_samples)
     
+    # Extract features using entropy
+    X_train_features = extract_features(X_train, sfreq, selected_features)
+    X_test_features = extract_features(X_test, sfreq, selected_features)
     
-    # Perform classification using stratified cv
-    y_pred = cross_val_predict(clf, X_train, y_train, cv=cv)
-        
-        
+    # Train the classifier on the training data
+    clf.fit(X_train_features, y_train)
     
-    # Evaluate performance
+    # Make predictions on the testing data
+    y_test_pred = clf.predict(X_test_features)
+
+
+    # Perform classification using stratified cv on training data
+    y_pred = cross_val_predict(clf, X_train_features, y_train, cv=cv)
+    
+    # Train the classifier on the full training set
+    clf.fit(X_train_features, y_train)
+    
+    # Test the classifier on the testing set
+    y_pred_test = clf.predict(X_test_features)
+    
+    # Evaluate performance on training set
     accuracy = accuracy_score(y_train_true, y_pred)
     recall = recall_score(y_train_true, y_pred)
     precision = precision_score(y_train_true, y_pred)
-    # cm = sklearn.metrics.confusion_matrix(y_train_true, y_pred)
+    f1 = f1_score(y_test_true, y_test_pred)
+    confmat = confusion_matrix(y_train_true, y_pred)
+    # results.append((accuracy,recall,precision,f1))
     
-    tp = np.sum((y_pred == 1) & (y_train_true == 1))
-    tn = np.sum((y_pred == 0) & (y_train_true == 0))
-    fp = np.sum((y_pred == 1) & (y_train_true == 0))
-    fn = np.sum((y_pred == 0) & (y_train_true == 1))
+    # tp = np.sum((y_pred == 1) & (y_train_true == 1))
+    # tn = np.sum((y_pred == 0) & (y_train_true == 0))
+    # fp = np.sum((y_pred == 1) & (y_train_true == 0))
+    # fn = np.sum((y_pred == 0) & (y_train_true == 1))
     
-    cm = np.array([[tn, fp], [fn, tp]])
+    # cm = np.array([[tn, fp], [fn, tp]])
     
-    # Store the results
+    # Store the results for training data
     results['accuracy'][i] = accuracy
     results['recall'][i] = recall
     results['precision'][i] = precision
-    results['confmat'][i] = cm
+    results['f1'][i] = f1
+    results['confmat'][i] = confmat
+    
 
-stop
 
+#%% Plotting
 # Create a time axis in seconds
-time_axis = np.arange(n_timewindows) * window + window / 2
+time_axis = np.arange(n_timewindows) * window_length + window_length / 2
+window_starts = np.arange(0, n_timewindows * window_length, window_length) * sfreq
 
+x_labels = times[window_starts]
+
+acc = [r[0] for r in results]
 # Plot the results
+# plt.plot(range(0, n_timewindows), acc, label='Accuracy')
 plt.plot(time_axis, results['accuracy'], label='Accuracy')
-plt.plot(time_axis, results['recall'], label='Recall')
-plt.plot(time_axis, results['precision'], label='Precision')
+# plt.plot(time_axis, results['recall'], label='Recall')
+# plt.plot(time_axis, results['precision'], label='Precision')
 
 # Add labels and legend
 plt.xlabel('Time (s)')
 plt.ylabel('Score')
+plt.xticks(range(0, n_timewindows))
 plt.legend()
 
 # Show the plot
 plt.show()
-
-
-
-
-
