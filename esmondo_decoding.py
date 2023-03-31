@@ -6,6 +6,7 @@ Dummy testing of decoders
 
 @author: Ardiansyah Esmondo and Simon Kern
 """
+import os
 import ospath
 import mne
 import pandas as pd
@@ -120,8 +121,7 @@ for folder in tqdm(folders_subj, desc='loading participant localizers'):
         
 
 
-#%% Data Storage (Predictor and Labels)
-
+#%% Dataset Storage
 
 # frontal = [ch for ch in settings.ch_names if ch.startswith('F')]
 
@@ -143,12 +143,32 @@ for name in data_name:
         low_before.append(name)
     elif "low-after" in name:
         low_after.append(name)
+        
+
+subject_ids = []
+category_ids = []
+
+for dt in data_name:
+    split_data = dt.split("-")
+    subject_id = split_data[0]
+    category_id = "-".join(split_data[1:])
+    
+    if subject_id not in subject_ids:
+        subject_ids.append(subject_id)
+    if category_id not in category_ids:
+        category_ids.append(category_id)
+        
+plot_dir =    "/home/ardiansyah.esmondo/Pictures/plots"   
+if not os.path.exists(plot_dir):
+    os.mkdir(plot_dir)  
 
 #%% Initiate X and y from specific dataset group
 
+whichdata = low_after
+
 results_df = pd.DataFrame(columns=['dataset', 'accuracy'])
 
-for subject in high_before:
+for subject in whichdata:
 
     # Take data from the chosen dataset above
     X_times, X, y = data_test[subject]
@@ -263,6 +283,8 @@ for subject in high_before:
     for i in range(n_timewindows):
         X_features += [extract_features(X_timewindows[i,:,:,:], sfreq, feature_names, 
                                       {'pow_freq_bands__freq_bands':freq_bands})]
+        
+        
     
     # X_features shape is (n_windows, n_epochs, n_features)    
     X_features = np.array(X_features)
@@ -286,6 +308,8 @@ for subject in high_before:
         X_window_pca = pca.fit_transform(X_window)
         
         X_pca += [X_window_pca]
+        
+        
         
     X_pca_con = np.array(X_pca)
     
@@ -345,34 +369,48 @@ for subject in high_before:
     
     #%% Plotting
     
-    # time_axis = np.arange(n_timewindows) * window_length + window_length / 2
+    time_axis = np.arange(n_timewindows) * window_length + window_length / 2
     
-    # time_start = times[0]
-    # time_end = times[-1]
+    time_start = times[0]
+    time_end = times[-1]
     
-    # x_labels = np.linspace(time_start, time_end, n_timewindows, endpoint=False)
+    x_labels = np.linspace(time_start, time_end, n_timewindows, endpoint=False)
     
-    # fig, ax = plt.subplots()
+    title = 'Decoding Accuracy for ' + subject
     
-    # ax.plot(x_labels, gaussian_filter(results['accuracy'], 1), label='Accuracy')
-    # ax.axvline(0, color='k', linestyle='--', label='Onset')
-    # ax.axhline(0.5, color='r', linestyle='--', label='Chance')
+    fig, ax = plt.subplots()
     
-    # ax.set_xlabel('Time (s)')
-    # ax.set_ylabel('Decoding Accuracy')
-    # ax.set_ylim([0.3, 0.7])
-    # ax.legend(loc='lower right')
+    ax.plot(x_labels, gaussian_filter(results['accuracy'], 1), label='Accuracy')
+    ax.axvline(0, color='k', linestyle='--', label='Onset')
+    ax.axhline(0.5, color='r', linestyle='--', label='Chance')
     
-    # # plt.plot(x_labels, gaussian_filter(results['accuracy'], 1))
-    # # plt.xlabel('Time (s)')
-    # # plt.ylabel('Accuracy')
-    # # onset_time = 0.0  # replace with your desired onset time
-    # # plt.axvline(x=onset_time, linestyle='--', color='gray')
-    # # plt.show()
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Decoding Accuracy')
+    ax.set_ylim([0.3, 0.7])
+    ax.legend(loc='lower right')
+    ax.set_title(title)
+    
+    plt.savefig(os.path.join(plot_dir, subject + '.png'))
+    plt.close()
+    
+
 
 
 
     #%% after looping all subjects
-    results_df = results_df.append({'dataset': subject,
-                                   'accuracy': results['accuracy']},
-                                   ignore_index=True)
+    del results['confmat']
+    df_subj = pd.DataFrame(results|
+                          {'dataset':subject,
+                           'time': times[4:-5]}
+                          )
+    results_df = pd.concat([results_df, df_subj], ignore_index=True)
+
+title = 'Decoding Accuracy for ' + category_ids[1]
+fig, ax = plt.subplots()
+sns.lineplot(results_df, x='time', y='accuracy')
+ax=plt.gca()
+ax.axvline(0, color='k', linestyle='--', label='Onset')
+ax.axhline(0.5, color='r', linestyle='--', label='Chance')
+ax.set_title(title)
+plt.savefig(os.path.join(plot_dir, category_ids[1] + '.png'))
+ax.legend()
