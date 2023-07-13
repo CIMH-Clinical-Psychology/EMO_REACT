@@ -2,6 +2,8 @@
 
 Sleep plays an important role in memory. More specifically sleep is closely linked to memory reprocessing, and specificities such as the emotional content of the memories can have an impact on the reprocessing during sleep. Literature showed that the emotional events tend to be remembered better than neutral events. M. Schönauer, S. Alizadeh, H. Jamalabadi, A. Abraham, A. Pawlizki & S. Gais (2017) showed that memory reprocessing occurs in different stages of sleep (REM and NREM) and that each one of these specific sleep stages pertains to different aspects of the consolidation process. We will us a similar approach to answer questions related to memory emotional reprocessing. More specifically we are interested on the impact of emotional images on the memory reprocessing during sleep and will contrast them with neutral images.
 
+see also the prestudy: https://github.com/CIMH-Clinical-Psychology/EMO-REACT-prestudy
+
 ## Project sketch
 <img width="1163" alt="Screenshot 2023-02-10 at 10 42 17" src="https://user-images.githubusercontent.com/15683682/218058562-ba3639c7-0b71-4f0a-8e59-9d4794a2d0a1.png">
 
